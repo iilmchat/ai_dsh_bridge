@@ -6,10 +6,37 @@
  */
 import { z } from 'zod';
 
+/** Схема части `image_url` (S3: изображение загружается в DeepSeek). */
+const ImageUrlPartSchema = z
+  .object({
+    type: z.literal('image_url'),
+    image_url: z
+      .object({
+        url: z.string().min(1),
+        detail: z.enum(['auto', 'low', 'high']).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
+/** Схема текстовой части `content`. */
+const TextPartSchema = z
+  .object({
+    type: z.literal('text'),
+    text: z.string(),
+  })
+  .strict();
+
+/** Часть `content` в OpenAI-формате (текст или изображение). */
+const ContentPartSchema = z.discriminatedUnion('type', [TextPartSchema, ImageUrlPartSchema]);
+
+/** Содержимое сообщения: строка, массив частей (vision) или `null`. */
+const MessageContentSchema = z.union([z.string(), z.array(ContentPartSchema)]).nullable();
+
 /** Схема сообщения OpenAI. */
 const MessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant', 'tool']),
-  content: z.string().nullable(),
+  content: MessageContentSchema,
   name: z.string().optional(),
   tool_call_id: z.string().optional(),
   tool_calls: z

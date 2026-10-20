@@ -15,10 +15,32 @@ export interface OpenAiToolCall {
   };
 }
 
+/** Текстовая часть `content` (формат OpenAI content parts). */
+export interface OpenAiTextContentPart {
+  readonly type: 'text';
+  readonly text: string;
+}
+
+/** Часть `image_url` (S3: изображение уходит в DeepSeek через `ref_file_ids`). */
+export interface OpenAiImageUrlContentPart {
+  readonly type: 'image_url';
+  readonly image_url: {
+    /** `data:image/...;base64,...` или `http(s)`-URL. */
+    readonly url: string;
+    readonly detail?: 'auto' | 'low' | 'high' | undefined;
+  };
+}
+
+/** Часть `content` в формате OpenAI. */
+export type OpenAiContentPart = OpenAiTextContentPart | OpenAiImageUrlContentPart;
+
+/** Содержимое сообщения: строка, массив частей (vision) или `null`. */
+export type OpenAiMessageContent = string | readonly OpenAiContentPart[] | null;
+
 /** Сообщение диалога OpenAI. */
 export interface OpenAiMessage {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
-  readonly content: string | null;
+  readonly content: OpenAiMessageContent;
   readonly name?: string | undefined;
   readonly tool_call_id?: string | undefined;
   readonly tool_calls?: readonly OpenAiToolCall[] | undefined;

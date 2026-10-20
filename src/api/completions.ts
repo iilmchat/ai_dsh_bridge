@@ -13,11 +13,16 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { loadAuthAsync, type Auth } from '../config.js';
 import {
   createChatSessionAsync,
+  fetchFilesAsync,
   sendChatAsync,
+  uploadFileAsync,
   validateSessionAsync,
   type ChatSession,
   type ClientDependencies,
   type DeepSeekEvent,
+  type FileInfo,
+  type UploadedFile,
+  type UploadFileInput,
 } from '../deepseek/client.js';
 import {
   AuthExpiredError,
@@ -35,7 +40,10 @@ import type {
   OpenAiMessage,
   OpenAiToolCall,
 } from '../translate/types.js';
-import { ChatCompletionRequestSchema } from './completions.schema.js';
+import {
+  ChatCompletionRequestSchema,
+  type ChatCompletionRequestBody,
+} from './completions.schema.js';
 
 /** Зависимости обработчика (для unit-тестов). */
 export interface CompletionsDependencies {
@@ -49,6 +57,10 @@ export interface CompletionsDependencies {
     clientDependencies?: ClientDependencies,
   ) => AsyncIterable<DeepSeekEvent>;
   readonly assembleText?: (events: AsyncIterable<DeepSeekEvent>) => Promise<AssembledText>;
+  /** Загрузка изображения в DeepSeek (по умолчанию `uploadFileAsync`). */
+  readonly uploadFile?: (auth: Auth, file: UploadFileInput) => Promise<UploadedFile>;
+  /** Ожидание готовности файлов (по умолчанию `fetchFilesAsync`). */
+  readonly fetchFiles?: (auth: Auth, fileIds: readonly string[]) => Promise<readonly FileInfo[]>;
   readonly now?: () => number;
   readonly generateId?: () => string;
 }
@@ -78,6 +90,145 @@ const upstreamStatus = (error: unknown): number => {
   return 502;
 };
 
+/** Максимальный размер входного изображения (10 МиБ, DESIGN § 3.5). */
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/** Таймаут скачивания изображения по `http(s)`, мс. */
+const IMAGE_DOWNLOAD_TIMEOUT_MS = 15_000;
+
+/** `data:image/png;base64,...` (пробелы и переводы строк в base64 допустимы). */
+const DATA_URL_PATTERN = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/iu;
+
+/** Ошибка входного изображения (некорректный `image_url`). */
+class ImageInputError extends Error {
+  public override readonly name = 'ImageInputError';
+
+  public constructor(message: string) {
+    super(message);
+  }
+}
+
+/**
+ * Извлекает `image_url` из `content`-частей сообщений (S3).
+ * Строковый `content` и части `text` не дают изображений.
+ *
+ * @param messages Сообщения запроса.
+ * @returns URL изображений в порядке сообщений.
+ */
+const extractImageUrls = (messages: ChatCompletionRequestBody['messages']): string[] => {
+  const urls: string[] = [];
+  for (const message of messages) {
+    if (!Array.isArray(message.content)) {
+      continue;
+    }
+    for (const part of message.content) {
+      if (part.type === 'image_url') {
+        urls.push(part.image_url.url);
+      }
+    }
+  }
+  return urls;
+};
+
+/**
+ * Определяет расширение файла по MIME-типу.
+ * @param mimeType MIME-тип изображения.
+ */
+const extensionForMimeType = (mimeType: string): string => {
+  const subtype = mimeType.toLowerCase().split('/')[1] ?? 'png';
+  const normalized = subtype === 'jpeg' ? 'jpg' : subtype === 'svg+xml' ? 'svg' : subtype;
+  const safe = normalized.replaceAll(/[^a-z0-9]/gu, '');
+  return safe === '' ? 'png' : safe;
+};
+
+/**
+ * Собирает имя файла для multipart по порядковому номеру и MIME-типу.
+ * @param index Индекс изображения.
+ * @param mimeType MIME-тип.
+ */
+const imageFileName = (index: number, mimeType: string): string =>
+  `image-${String(index + 1)}.${extensionForMimeType(mimeType)}`;
+
+/**
+ * Декодирует `data:image/...;base64,...` в данные для `upload_file`.
+ * @param url data-URL изображения.
+ * @param index Индекс изображения (для имени файла).
+ */
+const decodeDataUrlImage = (url: string, index: number): UploadFileInput => {
+  const match = DATA_URL_PATTERN.exec(url);
+  if (match === null || match[1] === undefined || match[2] === undefined) {
+    throw new ImageInputError(
+      'image_url: поддерживаются data:image/<mime>;base64,... и http(s)-URL',
+    );
+  }
+  const mimeType = match[1].toLowerCase();
+  const data = Buffer.from(match[2], 'base64');
+  if (data.length === 0) {
+    throw new ImageInputError('image_url: пустые данные изображения');
+  }
+  if (data.length > MAX_IMAGE_BYTES) {
+    throw new ImageInputError('image_url: изображение больше 10 МиБ');
+  }
+  return { data, mimeType, fileName: imageFileName(index, mimeType) };
+};
+
+/**
+ * Загружает изображение по `image_url` (data-URL или http(s)-URL).
+ * @param url URL изображения.
+ * @param index Индекс изображения (для имени файла).
+ */
+const loadImageAsync = async (url: string, index: number): Promise<UploadFileInput> => {
+  if (url.startsWith('data:')) {
+    return decodeDataUrlImage(url, index);
+  }
+  if (!/^https?:\/\//iu.test(url)) {
+    throw new ImageInputError(
+      'image_url: неподдерживаемая схема (ожидается data:image/...;base64,... или http(s))',
+    );
+  }
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS),
+    });
+  } catch {
+    throw new ImageInputError('image_url: не удалось скачать изображение');
+  }
+  if (!response.ok) {
+    throw new ImageInputError(`image_url: HTTP ${String(response.status)} при скачивании`);
+  }
+  const contentType =
+    (response.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  if (!contentType.startsWith('image/')) {
+    throw new ImageInputError('image_url: ответ не является изображением');
+  }
+  const data = new Uint8Array(await response.arrayBuffer());
+  if (data.length === 0) {
+    throw new ImageInputError('image_url: пустые данные изображения');
+  }
+  if (data.length > MAX_IMAGE_BYTES) {
+    throw new ImageInputError('image_url: изображение больше 10 МиБ');
+  }
+  return { data, mimeType: contentType, fileName: imageFileName(index, contentType) };
+};
+
+/**
+ * Загружает все изображения из `messages`.
+ * @param messages Сообщения запроса.
+ * @returns Входные данные для `upload_file`.
+ */
+const loadImagesAsync = async (
+  messages: ChatCompletionRequestBody['messages'],
+): Promise<UploadFileInput[]> => {
+  const urls = extractImageUrls(messages);
+  const images: UploadFileInput[] = [];
+  for (const [index, url] of urls.entries()) {
+    images.push(await loadImageAsync(url, index));
+  }
+  return images;
+};
+
 /**
  * Регистрирует маршрут `POST /v1/chat/completions`.
  *
@@ -103,6 +254,13 @@ export const registerCompletionsRoute = async (
       clientDependencies?: ClientDependencies,
     ) => sendChatAsync(request, auth, chatSessionId, clientDependencies));
   const assembleText = dependencies.assembleText ?? assembleTextFromEvents;
+  const uploadFile =
+    dependencies.uploadFile ??
+    ((auth: Auth, file: UploadFileInput): Promise<UploadedFile> => uploadFileAsync(auth, file));
+  const fetchFiles =
+    dependencies.fetchFiles ??
+    ((auth: Auth, fileIds: readonly string[]): Promise<readonly FileInfo[]> =>
+      fetchFilesAsync(auth, fileIds));
   const now = dependencies.now ?? ((): number => Date.now());
   const generateId = dependencies.generateId ?? defaultGenerateId;
 
@@ -154,15 +312,35 @@ export const registerCompletionsRoute = async (
       return sendError(reply, 400, 'invalid_request_error', String(error));
     }
 
+    // S3: изображения из `content` (data:base64 и http(s)) готовим заранее —
+    // ошибки входного image_url возвращаем как 400 до похода в DeepSeek.
+    let images: UploadFileInput[];
+    try {
+      images = await loadImagesAsync(body.messages);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return sendError(reply, 400, 'invalid_request_error', message);
+    }
+
     let assembled: AssembledText;
     let parsedDsml: ParsedDsml;
     try {
+      const refFileIds: string[] = [];
+      for (const image of images) {
+        const uploaded = await uploadFile(auth, image);
+        refFileIds.push(uploaded.id);
+      }
+      if (refFileIds.length > 0) {
+        await fetchFiles(auth, refFileIds);
+      }
       const chatSession = await createChatSession(auth);
       const completionRequest: Omit<DeepSeekCompletionRequest, 'chat_session_id'> = {
         parent_message_id: null,
+        // Захват 2026-10-20: при изображении клиент отправляет model_type
+        // "default", а картинка передаётся через ref_file_ids (не "vision").
         model_type: body.model === 'deepseek-web-reasoner' ? 'reasoner' : 'default',
         prompt,
-        ref_file_ids: [],
+        ref_file_ids: refFileIds,
         thinking_enabled: body.model === 'deepseek-web-reasoner',
         search_enabled: false,
         action: null,

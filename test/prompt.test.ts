@@ -196,6 +196,38 @@ describe('buildPromptAsync', () => {
     expect(result.prompt).toContain('просто «Готово»');
   });
 
+  it('принимает content-части: текст собирается, image_url игнорируется (S3)', () => {
+    const messages: OpenAiMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Что на картинке?' },
+          { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
+        ],
+      },
+    ];
+    const result = buildPromptAsync({ messages });
+    expect(result.prompt).toContain('[USER]\nЧто на картинке?');
+    expect(result.prompt).not.toContain('data:image');
+    expect(result.prompt).not.toContain('[object Object]');
+  });
+
+  it('склеивает несколько text-частей и не падает на пустом массиве частей', () => {
+    const messages: OpenAiMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'первая строка' },
+          { type: 'image_url', image_url: { url: 'https://example.com/a.png' } },
+          { type: 'text', text: 'вторая строка' },
+        ],
+      },
+      { role: 'user', content: [] },
+    ];
+    const result = buildPromptAsync({ messages });
+    expect(result.prompt).toContain('[USER]\nпервая строка\nвторая строка');
+  });
+
   it('tool-результат: сохраняет путь и помечает пустой content', () => {
     const withPath = buildPromptAsync({
       messages: [{ role: 'tool', content: 'C:\\path', tool_call_id: 'call_1' }],

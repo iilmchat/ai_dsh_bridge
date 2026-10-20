@@ -8,11 +8,18 @@
  * Важно: challenge запрашивается под `target_path` конкретного эндпоинта
  * (`/api/v0/chat/completion`); PoW нельзя кэшировать между эндпоинтами.
  */
+import { randomBytes } from 'node:crypto';
 import { request } from 'undici';
 import { z } from 'zod';
 import type { Auth } from '../config.js';
 import { encodePowResponse, solvePowAsync, type SolvePowOptions } from './pow.js';
-import { AuthExpiredError, DeepSeekApiError, DeepSeekNonSseError, type NonSseResponseDiagnostics } from './errors.js';
+import {
+  AuthExpiredError,
+  DeepSeekApiError,
+  DeepSeekNonSseError,
+  FileProcessingTimeoutError,
+  type NonSseResponseDiagnostics,
+} from './errors.js';
 import {
   PowChallengeSchema,
   type ChatCompletionRequest,
@@ -25,6 +32,18 @@ export const DEEPSEEK_BASE_URL = 'https://chat.deepseek.com';
 
 /** `target_path` для PoW перед chat completion. */
 export const CHAT_COMPLETION_TARGET_PATH = '/api/v0/chat/completion';
+
+/** `target_path` для PoW перед загрузкой файла (`upload_file`). */
+export const UPLOAD_FILE_TARGET_PATH = '/api/v0/file/upload_file';
+
+/** Путь статуса загруженных файлов (`fetch_files`). */
+export const FETCH_FILES_PATH = '/api/v0/file/fetch_files';
+
+/** Таймаут ожидания готовности файла (PENDING → SUCCESS) по умолчанию. */
+const DEFAULT_FETCH_FILES_TIMEOUT_MS = 30_000;
+
+/** Интервал опроса `fetch_files` по умолчанию. */
+const DEFAULT_FETCH_FILES_POLL_INTERVAL_MS = 500;
 
 /** Сколько попыток делать при `40301 INVALID_POW_RESPONSE`/сетевых сбоях. */
 const DEFAULT_MAX_ATTEMPTS = 3;
@@ -57,7 +76,7 @@ export type HttpClientAsync = (
   init: {
     readonly method: 'GET' | 'POST';
     readonly headers: Readonly<Record<string, string>>;
-    readonly body?: string;
+    readonly body?: string | Uint8Array;
   },
 ) => Promise<HttpClientResponse>;
 
@@ -68,6 +87,12 @@ export interface ClientDependencies {
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly baseUrl?: string;
   readonly maxAttempts?: number;
+  /** Часы (для тестов таймаута polling `fetch_files`). */
+  readonly now?: () => number;
+  /** Таймаут ожидания готовности файла, мс. */
+  readonly fetchFilesTimeoutMs?: number;
+  /** Интервал опроса `fetch_files`, мс. */
+  readonly fetchFilesPollIntervalMs?: number;
   readonly onPowSolved?: (info: { readonly answer: number; readonly elapsedMs: number }) => void;
   /** Вызывается после получения PoW-challenge (для e2e-логирования). */
   readonly onChallenge?: (challenge: PowChallenge) => void;
@@ -112,6 +137,93 @@ const ChatSessionEnvelopeSchema = z.object({
     })
     .optional(),
 });
+
+/** Статусы разбора файла DeepSeek (ответ `fetch_files`). */
+export const FileParseStatusSchema = z.enum([
+  'PENDING',
+  'PARSING',
+  'SUCCESS',
+  'FAILED',
+  'CONTENT_FILTER',
+  'CONTENT_TOO_LONG',
+  'CANCELLED',
+  'CONTENT_EMPTY',
+]);
+
+/** Статус разбора файла DeepSeek. */
+export type FileParseStatus = z.infer<typeof FileParseStatusSchema>;
+
+/** Информация о файле DeepSeek (ответ `fetch_files`). */
+export const FileInfoSchema = z.object({
+  id: z.string().min(1),
+  status: FileParseStatusSchema,
+  file_name: z.string().optional(),
+  file_size: z.number().optional(),
+  is_image: z.boolean().optional(),
+  audit_result: z.enum(['pass', 'reject', 'unknown']).nullable().optional(),
+  error_code: z.number().nullable().optional(),
+});
+
+/** Валидированная информация о файле DeepSeek. */
+export type FileInfo = z.infer<typeof FileInfoSchema>;
+
+/** Конверт ответа `POST /api/v0/file/upload_file`. */
+const UploadFileEnvelopeSchema = z.object({
+  code: z.number(),
+  msg: z.string().optional(),
+  data: z
+    .object({
+      biz_code: z.number().optional(),
+      biz_msg: z.string().optional(),
+      biz_data: z
+        .object({
+          id: z.string().min(1),
+          status: FileParseStatusSchema,
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/** Конверт ответа `GET /api/v0/file/fetch_files`. */
+const FetchFilesEnvelopeSchema = z.object({
+  code: z.number(),
+  msg: z.string().optional(),
+  data: z
+    .object({
+      biz_code: z.number().optional(),
+      biz_msg: z.string().optional(),
+      biz_data: z.object({ files: z.array(FileInfoSchema) }).optional(),
+    })
+    .optional(),
+});
+
+/** Статусы, при которых файл уже не будет обработан успешно. */
+const TERMINAL_FAILURE_STATUSES: ReadonlySet<FileParseStatus> = new Set([
+  'FAILED',
+  'CONTENT_FILTER',
+  'CONTENT_TOO_LONG',
+  'CANCELLED',
+  'CONTENT_EMPTY',
+]);
+
+/** Входные данные для `POST /api/v0/file/upload_file`. */
+export interface UploadFileInput {
+  /** Содержимое файла (PNG/JPEG и т.п.). */
+  readonly data: Uint8Array;
+  /** MIME-тип (`image/png`, …). */
+  readonly mimeType: string;
+  /** Имя файла для multipart-поля `file`. */
+  readonly fileName: string;
+}
+
+/** Результат загрузки файла в DeepSeek. */
+export interface UploadedFile {
+  /** Идентификатор файла (`file-…`) для `ref_file_ids`. */
+  readonly id: string;
+  /** Статус разбора на момент ответа (обычно `PENDING`). */
+  readonly status: FileParseStatus;
+}
 
 /** Проверяет, что значение — объект (type guard для `unknown`). */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -248,6 +360,30 @@ const buildAuthHeaders = (auth: Auth): Record<string, string> => ({
   cookie: buildCookie(auth),
 });
 
+/**
+ * Собирает тело multipart/form-data с единственным полем `file`
+ * (формат подтверждён захватом `docs/captures/upload-file-2026-10-20.http`).
+ *
+ * @param file Загружаемый файл.
+ * @returns Тело запроса и `boundary` для `Content-Type`.
+ */
+const buildMultipartBody = (
+  file: UploadFileInput,
+): { readonly body: Uint8Array; readonly boundary: string } => {
+  const boundary = `----DeepSeekBridgeFormBoundary${randomBytes(12).toString('hex')}`;
+  const safeFileName = file.fileName.replaceAll(/["\r\n]/g, '_');
+  const encoder = new TextEncoder();
+  const head = encoder.encode(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${safeFileName}"\r\nContent-Type: ${file.mimeType}\r\n\r\n`,
+  );
+  const tail = encoder.encode(`\r\n--${boundary}--\r\n`);
+  const body = new Uint8Array(head.length + file.data.length + tail.length);
+  body.set(head, 0);
+  body.set(file.data, head.length);
+  body.set(tail, head.length + file.data.length);
+  return { body, boundary };
+};
+
 /** Заголовки, которые нельзя включать в диагностику. */
 const SENSITIVE_HEADER_NAMES = new Set(['authorization', 'cookie', 'x-ds-pow-response']);
 
@@ -366,20 +502,22 @@ export const createChatSessionAsync = async (
 };
 
 /**
- * Запрашивает PoW-challenge под `target_path` chat completion.
+ * Запрашивает PoW-challenge под конкретный `target_path`.
  * @param auth Сессия.
  * @param dependencies Зависимости клиента.
+ * @param targetPath Эндпоинт, для которого решается PoW.
  */
 const requestPowChallengeAsync = async (
   auth: Auth,
   dependencies: Required<Pick<ClientDependencies, 'httpClient' | 'baseUrl'>>,
+  targetPath: string,
 ): Promise<PowChallenge> => {
   const response = await dependencies.httpClient(
     `${dependencies.baseUrl}/api/v0/chat/create_pow_challenge`,
     {
       method: 'POST',
       headers: { ...buildAuthHeaders(auth), 'content-type': 'application/json' },
-      body: JSON.stringify({ target_path: CHAT_COMPLETION_TARGET_PATH }),
+      body: JSON.stringify({ target_path: targetPath }),
     },
   );
   if (response.statusCode === 401) {
@@ -412,6 +550,176 @@ const requestPowChallengeAsync = async (
     throw new DeepSeekApiError(-1, 'challenge отсутствует в ответе DeepSeek');
   }
   return challenge;
+};
+
+/**
+ * Загружает файл в DeepSeek: PoW (`/api/v0/file/upload_file`) → multipart
+ * `POST /api/v0/file/upload_file` → `{ id, status }`.
+ *
+ * Формат multipart и заголовки подтверждены захватом 2026-10-20:
+ * одно поле `file`, заголовки `x-file-size`, `x-model-type: default`,
+ * `x-thinking-enabled: 0`. Модель для vision — `default` + `ref_file_ids`.
+ *
+ * @param auth Сессия.
+ * @param file Данные файла и MIME-тип.
+ * @param dependencies Зависимости клиента.
+ * @returns `id` файла для `ref_file_ids` и его статус.
+ * @throws AuthExpiredError при 401.
+ * @throws DeepSeekApiError при ошибке HTTP/бизнес-ошибке.
+ */
+export const uploadFileAsync = async (
+  auth: Auth,
+  file: UploadFileInput,
+  dependencies: ClientDependencies = {},
+): Promise<UploadedFile> => {
+  const httpClient = dependencies.httpClient ?? defaultHttpClient;
+  const solvePow = dependencies.solvePow ?? solvePowAsync;
+  const baseUrl = (dependencies.baseUrl ?? DEEPSEEK_BASE_URL).replace(/\/+$/, '');
+  const resolved = { httpClient, baseUrl };
+
+  const challenge = await requestPowChallengeAsync(auth, resolved, UPLOAD_FILE_TARGET_PATH);
+  dependencies.onChallenge?.(challenge);
+  const pow = await solvePow(challenge, {
+    targetPath: UPLOAD_FILE_TARGET_PATH,
+    onSolved: (info) => {
+      dependencies.onPowSolved?.(info);
+    },
+  });
+  const { body, boundary } = buildMultipartBody(file);
+  const headers: Record<string, string> = {
+    ...buildAuthHeaders(auth),
+    'content-type': `multipart/form-data; boundary=${boundary}`,
+    'x-file-size': String(file.data.byteLength),
+    'x-model-type': 'default',
+    'x-thinking-enabled': '0',
+    'x-ds-pow-response': encodePowResponse(pow),
+  };
+  const response = await httpClient(`${baseUrl}${UPLOAD_FILE_TARGET_PATH}`, {
+    method: 'POST',
+    headers,
+    body,
+  });
+  if (response.statusCode === 401) {
+    await drainBodyAsync(response.body);
+    throw new AuthExpiredError();
+  }
+  const text = await readBodyAsync(response.body);
+  if (response.statusCode !== 200) {
+    throw new DeepSeekApiError(response.statusCode, text.slice(0, 200));
+  }
+  const envelope = UploadFileEnvelopeSchema.safeParse(safeJsonParse(text));
+  if (!envelope.success) {
+    throw new DeepSeekApiError(-1, 'Некорректный ответ upload_file');
+  }
+  if (envelope.data.code !== 0) {
+    throw new DeepSeekApiError(envelope.data.code, envelope.data.msg ?? '');
+  }
+  const data = envelope.data.data;
+  if (data?.biz_code !== undefined && data.biz_code !== 0) {
+    throw new DeepSeekApiError(data.biz_code, data.biz_msg ?? '');
+  }
+  const bizData = data?.biz_data;
+  if (bizData === undefined) {
+    throw new DeepSeekApiError(-1, 'upload_file: в ответе отсутствует biz_data');
+  }
+  return { id: bizData.id, status: bizData.status };
+};
+
+/**
+ * Однократный запрос статуса файла (`GET /api/v0/file/fetch_files`).
+ * @param auth Сессия.
+ * @param fileId Идентификатор файла.
+ * @param httpClient HTTP-клиент.
+ * @param baseUrl Базовый URL DeepSeek.
+ */
+const fetchFilesOnceAsync = async (
+  auth: Auth,
+  fileId: string,
+  httpClient: HttpClientAsync,
+  baseUrl: string,
+): Promise<readonly FileInfo[]> => {
+  const response = await httpClient(
+    `${baseUrl}${FETCH_FILES_PATH}?file_ids=${encodeURIComponent(fileId)}`,
+    { method: 'GET', headers: buildAuthHeaders(auth) },
+  );
+  if (response.statusCode === 401) {
+    await drainBodyAsync(response.body);
+    throw new AuthExpiredError();
+  }
+  const text = await readBodyAsync(response.body);
+  if (response.statusCode !== 200) {
+    throw new DeepSeekApiError(response.statusCode, text.slice(0, 200));
+  }
+  const envelope = FetchFilesEnvelopeSchema.safeParse(safeJsonParse(text));
+  if (!envelope.success) {
+    throw new DeepSeekApiError(-1, 'Некорректный ответ fetch_files');
+  }
+  if (envelope.data.code !== 0) {
+    throw new DeepSeekApiError(envelope.data.code, envelope.data.msg ?? '');
+  }
+  const data = envelope.data.data;
+  if (data?.biz_code !== undefined && data.biz_code !== 0) {
+    throw new DeepSeekApiError(data.biz_code, data.biz_msg ?? '');
+  }
+  return data?.biz_data?.files ?? [];
+};
+
+/**
+ * Ждёт готовности загруженных файлов (PENDING → SUCCESS).
+ *
+ * Опрашивает `GET /api/v0/file/fetch_files` по одному `id` (формат из
+ * захвата 2026-10-20), пока все файлы не получат статус `SUCCESS`.
+ * При терминальном статусе (`FAILED`, `CONTENT_FILTER`, …) бросает
+ * `DeepSeekApiError`; по истечении таймаута — `FileProcessingTimeoutError`.
+ *
+ * @param auth Сессия.
+ * @param fileIds Идентификаторы файлов из `upload_file`.
+ * @param dependencies Зависимости клиента.
+ * @returns Информация о файлах в порядке `fileIds`.
+ * @throws AuthExpiredError при 401.
+ * @throws DeepSeekApiError при бизнес-ошибке/терминальном статусе.
+ * @throws FileProcessingTimeoutError по истечении таймаута (30 с).
+ */
+export const fetchFilesAsync = async (
+  auth: Auth,
+  fileIds: readonly string[],
+  dependencies: ClientDependencies = {},
+): Promise<readonly FileInfo[]> => {
+  if (fileIds.length === 0) {
+    return [];
+  }
+  const httpClient = dependencies.httpClient ?? defaultHttpClient;
+  const sleep = dependencies.sleep ?? sleepAsync;
+  const now = dependencies.now ?? ((): number => Date.now());
+  const baseUrl = (dependencies.baseUrl ?? DEEPSEEK_BASE_URL).replace(/\/+$/, '');
+  const timeoutMs = dependencies.fetchFilesTimeoutMs ?? DEFAULT_FETCH_FILES_TIMEOUT_MS;
+  const pollIntervalMs =
+    dependencies.fetchFilesPollIntervalMs ?? DEFAULT_FETCH_FILES_POLL_INTERVAL_MS;
+  const startedAt = now();
+
+  for (;;) {
+    const infos: FileInfo[] = [];
+    for (const fileId of fileIds) {
+      infos.push(...(await fetchFilesOnceAsync(auth, fileId, httpClient, baseUrl)));
+    }
+    const byId = new Map(infos.map((info) => [info.id, info]));
+    const requested = fileIds.map((fileId) => byId.get(fileId));
+    const failure = requested.find(
+      (info) => info !== undefined && TERMINAL_FAILURE_STATUSES.has(info.status),
+    );
+    if (failure !== undefined) {
+      throw new DeepSeekApiError(-1, `Файл не обработан DeepSeek: статус ${failure.status}`);
+    }
+    if (requested.every((info): info is FileInfo => info?.status === 'SUCCESS')) {
+      return requested;
+    }
+    if (now() - startedAt >= timeoutMs) {
+      throw new FileProcessingTimeoutError(
+        `DeepSeek не обработал файл за ${String(timeoutMs)} мс (PENDING → SUCCESS).`,
+      );
+    }
+    await sleep(pollIntervalMs);
+  }
 };
 
 /**
@@ -582,7 +890,7 @@ export const openCompletionStreamAsync = async (
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const challenge = await requestPowChallengeAsync(auth, resolved);
+      const challenge = await requestPowChallengeAsync(auth, resolved, CHAT_COMPLETION_TARGET_PATH);
       dependencies.onChallenge?.(challenge);
       const pow = await solvePow(challenge, {
         targetPath: CHAT_COMPLETION_TARGET_PATH,

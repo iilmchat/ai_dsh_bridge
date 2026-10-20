@@ -5,10 +5,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHAT_COMPLETION_TARGET_PATH,
+  FETCH_FILES_PATH,
+  UPLOAD_FILE_TARGET_PATH,
   createChatSessionAsync,
+  fetchFilesAsync,
   parseSseStreamAsync,
   safeBodyPreview,
   sendChatAsync,
+  uploadFileAsync,
   validateSessionAsync,
   type DeepSeekEvent,
   type HttpClientAsync,
@@ -20,6 +24,7 @@ import {
   AuthExpiredError,
   DeepSeekApiError,
   DeepSeekNonSseError,
+  FileProcessingTimeoutError,
 } from '../src/deepseek/errors.js';
 import type { Auth } from '../src/config.js';
 import type { ChatCompletionRequest, PowChallenge } from '../src/deepseek/types.js';
@@ -85,7 +90,7 @@ data: {"click_behavior":"none","auto_resume":false}
 `;
 
 /** Синтетический challenge с известным решением (nonce = 0). */
-const buildSyntheticChallenge = (): PowChallenge => {
+const buildSyntheticChallenge = (targetPath = CHAT_COMPLETION_TARGET_PATH): PowChallenge => {
   const salt = 'capture-salt';
   const expireAt = 1_792_419_860_451;
   return {
@@ -96,7 +101,7 @@ const buildSyntheticChallenge = (): PowChallenge => {
     difficulty: 1,
     expire_at: expireAt,
     expire_after: 300_000,
-    target_path: CHAT_COMPLETION_TARGET_PATH,
+    target_path: targetPath,
   };
 };
 
@@ -105,8 +110,36 @@ interface HttpCall {
   readonly url: string;
   readonly method: string;
   readonly headers: Readonly<Record<string, string>>;
-  readonly body: string | undefined;
+  readonly body: string | Uint8Array | undefined;
 }
+
+/** Читает тело запроса как строку (multipart/binary приводятся к тексту). */
+const bodyToText = (body: string | Uint8Array | undefined): string => {
+  if (body === undefined) {
+    return '';
+  }
+  return typeof body === 'string' ? body : new TextDecoder().decode(body);
+};
+
+/** Ищет последовательность байтов в теле запроса. */
+const bodyContainsBytes = (body: string | Uint8Array | undefined, needle: readonly number[]): boolean => {
+  if (!(body instanceof Uint8Array)) {
+    return false;
+  }
+  for (let index = 0; index <= body.length - needle.length; index += 1) {
+    let matches = true;
+    for (let offset = 0; offset < needle.length; offset += 1) {
+      if (body[index + offset] !== needle[offset]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /** Обработчик фейкового HTTP. */
 type HttpHandler = (call: HttpCall) => HttpClientResponse | Promise<HttpClientResponse>;
@@ -161,8 +194,10 @@ const sseResponse = (text: string): HttpClientResponse => ({
 });
 
 /** Ответ challenge. */
-const challengeResponse = (): HttpClientResponse =>
-  jsonResponse({ code: 0, data: { biz_data: { challenge: buildSyntheticChallenge() } } });
+const challengeResponse = (
+  targetPath = CHAT_COMPLETION_TARGET_PATH,
+): HttpClientResponse =>
+  jsonResponse({ code: 0, data: { biz_data: { challenge: buildSyntheticChallenge(targetPath) } } });
 
 /** Ответ `/chat_session/create`. */
 const sessionResponse = (): HttpClientResponse =>
@@ -241,10 +276,10 @@ describe('sendChatAsync', () => {
 
     const challengeCall = http.calls.find((call) => call.url.includes('create_pow_challenge'));
     expect(challengeCall).toBeDefined();
-    expect(JSON.parse(challengeCall?.body ?? '{}')).toEqual({
+    expect(JSON.parse(bodyToText(challengeCall?.body))).toEqual({
       target_path: CHAT_COMPLETION_TARGET_PATH,
     });
-    expect(JSON.parse(challengeCall?.body ?? '{}')).not.toHaveProperty(
+    expect(JSON.parse(bodyToText(challengeCall?.body))).not.toHaveProperty(
       'target_path',
       '/api/v0/file/upload_file',
     );
@@ -257,7 +292,7 @@ describe('sendChatAsync', () => {
     expect(completionCall?.headers['accept']).toBe('text/event-stream');
     const decodedPow = decodePowResponse(completionCall?.headers['x-ds-pow-response'] ?? '');
     expect(decodedPow).toMatchObject({ target_path: CHAT_COMPLETION_TARGET_PATH });
-    expect(JSON.parse(completionCall?.body ?? '{}')).toMatchObject({
+    expect(JSON.parse(bodyToText(completionCall?.body))).toMatchObject({
       chat_session_id: TEST_CHAT_SESSION_ID,
     });
   });
@@ -509,6 +544,181 @@ describe('createChatSessionAsync', () => {
     await expect(
       createChatSessionAsync(TEST_AUTH, { httpClient: http.fn }),
     ).rejects.toBeInstanceOf(DeepSeekApiError);
+  });
+});
+
+/** Ответ upload_file. */
+const uploadFileResponse = (): HttpClientResponse =>
+  jsonResponse({
+    code: 0,
+    msg: '',
+    data: {
+      biz_code: 0,
+      biz_msg: '',
+      biz_data: { id: 'file-test-1', status: 'PENDING' },
+    },
+  });
+
+describe('uploadFileAsync', () => {
+  /** PNG-сигнатура: проверяем, что байты файла попали в multipart. */
+  const FILE_DATA = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const FILE_INPUT = { data: FILE_DATA, mimeType: 'image/png', fileName: 'image-1.png' };
+
+  it('решает PoW под upload_file и отправляет multipart с полем file', async () => {
+    const http = createHttpClient((call) =>
+      call.url.includes('create_pow_challenge') ? challengeResponse() : uploadFileResponse(),
+    );
+    const uploaded = await uploadFileAsync(TEST_AUTH, FILE_INPUT, { httpClient: http.fn });
+    expect(uploaded).toEqual({ id: 'file-test-1', status: 'PENDING' });
+
+    const challengeCall = http.calls.find((call) => call.url.includes('create_pow_challenge'));
+    expect(challengeCall).toBeDefined();
+    expect(JSON.parse(bodyToText(challengeCall?.body))).toEqual({
+      target_path: UPLOAD_FILE_TARGET_PATH,
+    });
+
+    const uploadCall = http.calls.find((call) => call.url.endsWith(UPLOAD_FILE_TARGET_PATH));
+    expect(uploadCall).toBeDefined();
+    expect(uploadCall?.method).toBe('POST');
+    expect(uploadCall?.headers['authorization']).toBe('Bearer bearer-token');
+    expect(uploadCall?.headers['x-file-size']).toBe(String(FILE_DATA.length));
+    expect(uploadCall?.headers['x-model-type']).toBe('default');
+    expect(uploadCall?.headers['x-thinking-enabled']).toBe('0');
+    expect(uploadCall?.headers['x-ds-pow-response']).toBeTruthy();
+    expect(decodePowResponse(uploadCall?.headers['x-ds-pow-response'] ?? '')).toMatchObject({
+      target_path: UPLOAD_FILE_TARGET_PATH,
+    });
+
+    const contentType = uploadCall?.headers['content-type'] ?? '';
+    const boundary = /boundary=(.+)$/u.exec(contentType)?.[1];
+    expect(boundary).toBeTruthy();
+    const bodyText = bodyToText(uploadCall?.body);
+    expect(bodyText).toContain(`--${String(boundary)}`);
+    expect(bodyText).toContain(
+      'Content-Disposition: form-data; name="file"; filename="image-1.png"',
+    );
+    expect(bodyText).toContain('Content-Type: image/png');
+    expect(bodyText).toContain(`--${String(boundary)}--`);
+    expect(bodyContainsBytes(uploadCall?.body, [...FILE_DATA])).toBe(true);
+  });
+
+  it('401 → AuthExpiredError', async () => {
+    const http = createHttpClient((call) =>
+      call.url.includes('create_pow_challenge')
+        ? challengeResponse()
+        : { statusCode: 401, headers: {}, body: chunksToStream(['Unauthorized']) },
+    );
+    await expect(
+      uploadFileAsync(TEST_AUTH, FILE_INPUT, { httpClient: http.fn }),
+    ).rejects.toBeInstanceOf(AuthExpiredError);
+  });
+
+  it('code !== 0 → DeepSeekApiError', async () => {
+    const http = createHttpClient((call) =>
+      call.url.includes('create_pow_challenge')
+        ? challengeResponse()
+        : jsonResponse({ code: 40_003, msg: 'UPLOAD_FAILED' }),
+    );
+    await expect(
+      uploadFileAsync(TEST_AUTH, FILE_INPUT, { httpClient: http.fn }),
+    ).rejects.toMatchObject({ name: 'DeepSeekApiError', code: 40_003 });
+  });
+
+  it('без biz_data.id → DeepSeekApiError', async () => {
+    const http = createHttpClient((call) =>
+      call.url.includes('create_pow_challenge')
+        ? challengeResponse()
+        : jsonResponse({ code: 0, data: { biz_code: 0, biz_data: {} } }),
+    );
+    await expect(
+      uploadFileAsync(TEST_AUTH, FILE_INPUT, { httpClient: http.fn }),
+    ).rejects.toBeInstanceOf(DeepSeekApiError);
+  });
+});
+
+/** Ответ fetch_files для одного файла. */
+const fetchFilesResponse = (status: string): HttpClientResponse =>
+  jsonResponse({
+    code: 0,
+    data: {
+      biz_code: 0,
+      biz_msg: '',
+      biz_data: {
+        files: [
+          {
+            id: 'file-1',
+            status,
+            file_name: 'image-1.png',
+            file_size: 8,
+            is_image: true,
+            audit_result: 'unknown',
+            error_code: null,
+          },
+        ],
+      },
+    },
+  });
+
+describe('fetchFilesAsync', () => {
+  it('опрашивает fetch_files, пока PENDING не сменится на SUCCESS', async () => {
+    const statuses = ['PENDING', 'PENDING', 'SUCCESS'];
+    let index = 0;
+    const http = createHttpClient(() => {
+      const status = statuses[Math.min(index, statuses.length - 1)] ?? 'SUCCESS';
+      index += 1;
+      return fetchFilesResponse(status);
+    });
+    const sleeps: number[] = [];
+    const result = await fetchFilesAsync(TEST_AUTH, ['file-1'], {
+      httpClient: http.fn,
+      sleep: (milliseconds) => {
+        sleeps.push(milliseconds);
+        return Promise.resolve();
+      },
+      fetchFilesPollIntervalMs: 128,
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.status).toBe('SUCCESS');
+    const calls = http.calls.filter((call) => call.url.includes(FETCH_FILES_PATH));
+    expect(calls).toHaveLength(3);
+    expect(calls[0]?.url).toContain('file_ids=file-1');
+    expect(sleeps).toEqual([128, 128]);
+  });
+
+  it('бросает FileProcessingTimeoutError при превышении таймаута', async () => {
+    let clock = 0;
+    const http = createHttpClient(() => fetchFilesResponse('PENDING'));
+    await expect(
+      fetchFilesAsync(TEST_AUTH, ['file-1'], {
+        httpClient: http.fn,
+        now: () => clock,
+        sleep: () => {
+          clock += 1000;
+          return Promise.resolve();
+        },
+        fetchFilesTimeoutMs: 3000,
+        fetchFilesPollIntervalMs: 1000,
+      }),
+    ).rejects.toBeInstanceOf(FileProcessingTimeoutError);
+  });
+
+  it('терминальный статус → DeepSeekApiError', async () => {
+    const http = createHttpClient(() => fetchFilesResponse('FAILED'));
+    await expect(
+      fetchFilesAsync(TEST_AUTH, ['file-1'], { httpClient: http.fn }),
+    ).rejects.toMatchObject({ name: 'DeepSeekApiError' });
+  });
+
+  it('401 → AuthExpiredError', async () => {
+    const http = createHttpClient(() => ({
+      statusCode: 401,
+      headers: {},
+      body: chunksToStream(['Unauthorized']),
+    }));
+    await expect(
+      fetchFilesAsync(TEST_AUTH, ['file-1'], { httpClient: http.fn }),
+    ).rejects.toBeInstanceOf(AuthExpiredError);
   });
 });
 

@@ -14,6 +14,19 @@
 
 ### Added
 
+- S3: поддержка изображений (`image_url`) в `POST /v1/chat/completions`:
+  `data:image/...;base64,...` и http(s)-URL загружаются в DeepSeek
+  (`POST /api/v0/file/upload_file`, multipart, PoW), шлюз ждёт разбора
+  (`GET /api/v0/file/fetch_files`, PENDING → SUCCESS, таймаут 30 с) и
+  передаёт `ref_file_ids` в `POST /api/v0/chat/completion`; `model_type`
+  остаётся `default` (как в захвате 2026-10-20).
+- `src/deepseek/client.ts`: `uploadFileAsync` (multipart-поле `file`,
+  заголовки `x-file-size`, `x-model-type: default`, `x-thinking-enabled: 0`,
+  PoW под `/api/v0/file/upload_file`) и `fetchFilesAsync` (polling,
+  PENDING → SUCCESS, таймаут 30 с); Zod-схемы ответов `upload_file` и
+  `fetch_files`.
+- Zod-схема запроса принимает `content` массивом частей (`text` /
+  `image_url`, OpenAI-совместимый формат).
 - `GET /v1/models` отдаёт `capabilities` (`tools`, `function_calling`,
   `streaming`) в каждой карточке модели — DSH видит поддержку инструментов
   и передаёт `tools` в запросах (маршрут вынесен в `src/api/models.ts`).
@@ -23,10 +36,21 @@
 
 ### Changed
 
+- `src/translate/prompt.ts`: части `image_url` в `content` игнорируются,
+  в prompt попадает только текст (изображение доставляется через
+  `ref_file_ids`, а не текстом).
 - `docs/ROADMAP.md` v0.6.0: S1 (`screenshot`) и S2 (OCR) переведены в
   Done, S3 (`ref_file_ids`) и S4 (LLaVA) — Todo; закрыт backlog-KI-1001
   (OCR): реализован few-shot `bash` + `tesseract` (полный путь,
   `where tesseract`), R-06-01 → Done.
+
+### Fixed
+
+- KI-1003 (Base64-картинки в DeepSeek Web) → Fixed (S3, 0.6.0-alpha):
+  изображения передаются через `upload_file` + `ref_file_ids`; проверено
+  живым e2e (модель описала загруженную картинку). Захваты:
+  `docs/captures/upload-file-2026-10-20.http`,
+  `docs/captures/chat-completion-vision-2026-10-20.http`.
 
 ---
 

@@ -37,6 +37,27 @@ const USER_PAYLOAD = {
   messages: [{ role: 'user', content: 'привет' }],
 };
 
+/** Минимальный PNG 1×1 в data:base64 (S3, `image_url`). */
+const IMAGE_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+/** Запрос с изображением в OpenAI-формате content parts. */
+const IMAGE_PAYLOAD = {
+  model: 'deepseek-web-chat',
+  messages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Что на картинке?' },
+        { type: 'image_url', image_url: { url: IMAGE_DATA_URL } },
+      ],
+    },
+  ],
+};
+
+/** Тип тела запроса, который получает `sendChat` из обработчика. */
+type SendChatRequest = Parameters<NonNullable<CompletionsDependencies['sendChat']>>[0];
+
 /** Базовые зависимости (все успешные). */
 const baseDependencies = (): CompletionsDependencies => ({
   loadAuth: () => Promise.resolve(TEST_AUTH),
@@ -289,6 +310,86 @@ describe('POST /v1/chat/completions (K1)', () => {
       method: 'POST',
       url: '/v1/chat/completions',
       payload: USER_PAYLOAD,
+    });
+    expect(response.statusCode).toBe(502);
+    expect(response.json().error.type).toBe('upstream_error');
+  });
+});
+
+describe('POST /v1/chat/completions — изображения (S3)', () => {
+  it('200: image_url (data:base64) → upload_file → ref_file_ids в completion', async () => {
+    const uploadedFiles: Array<{ fileName: string; mimeType: string; bytes: number }> = [];
+    const fetchedIds: string[][] = [];
+    let capturedRequest: SendChatRequest | undefined;
+    const app = await buildApp({
+      uploadFile: (_auth, file) => {
+        uploadedFiles.push({
+          fileName: file.fileName,
+          mimeType: file.mimeType,
+          bytes: file.data.byteLength,
+        });
+        return Promise.resolve({ id: 'file-abc', status: 'PENDING' });
+      },
+      fetchFiles: (_auth, ids) => {
+        fetchedIds.push([...ids]);
+        return Promise.resolve(ids.map((id) => ({ id, status: 'SUCCESS' as const })));
+      },
+      sendChat: async function* (request: SendChatRequest): AsyncGenerator<DeepSeekEvent> {
+        capturedRequest = request;
+        yield { type: 'text', content: 'На картинке тест.' };
+        yield { type: 'status', status: 'FINISHED' };
+      },
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: IMAGE_PAYLOAD,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0].message.content).toBe('На картинке тест.');
+    expect(uploadedFiles).toHaveLength(1);
+    expect(uploadedFiles[0]?.mimeType).toBe('image/png');
+    expect(uploadedFiles[0]?.fileName).toMatch(/^image-1\.png$/u);
+    expect(uploadedFiles[0]?.bytes).toBeGreaterThan(0);
+    expect(fetchedIds).toEqual([['file-abc']]);
+    expect(capturedRequest?.ref_file_ids).toEqual(['file-abc']);
+    expect(capturedRequest?.model_type).toBe('default');
+    expect(capturedRequest?.prompt).toContain('Что на картинке?');
+    expect(capturedRequest?.prompt).not.toContain('data:image');
+  });
+
+  it('400: неподдерживаемая схема image_url', async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: {
+        model: 'deepseek-web-chat',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Что на картинке?' },
+              { type: 'image_url', image_url: { url: 'ftp://example.com/image.png' } },
+            ],
+          },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.type).toBe('invalid_request_error');
+  });
+
+  it('502: ошибка upload_file → upstream_error', async () => {
+    const app = await buildApp({
+      uploadFile: () => Promise.reject(new DeepSeekApiError(40_003, 'UPLOAD_FAILED')),
+      sendChat: sendChatWith([{ type: 'text', content: 'ok' }]),
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: IMAGE_PAYLOAD,
     });
     expect(response.statusCode).toBe(502);
     expect(response.json().error.type).toBe('upstream_error');

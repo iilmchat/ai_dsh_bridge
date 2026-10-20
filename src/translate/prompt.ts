@@ -47,6 +47,29 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
 /**
+ * Извлекает текст сообщения: строка — как есть, массив частей — только
+ * `text`-части. Части `image_url` игнорируются: изображение передаётся в
+ * DeepSeek отдельно через `ref_file_ids` (S3, KI-1003).
+ *
+ * @param content Содержимое сообщения OpenAI.
+ */
+const extractTextContent = (content: OpenAiMessage['content']): string => {
+  if (content === null) {
+    return '';
+  }
+  if (typeof content === 'string') {
+    return content;
+  }
+  const texts: string[] = [];
+  for (const part of content) {
+    if (part.type === 'text') {
+      texts.push(part.text);
+    }
+  }
+  return texts.join('\n');
+};
+
+/**
  * Разбирает строку аргументов инструмента (JSON) в объект.
  * При некорректном JSON сохраняет сырое значение как `arguments`.
  * @param raw Строка аргументов из `tool_calls[].function.arguments`.
@@ -266,7 +289,7 @@ export const buildPromptAsync = (options: BuildPromptOptions): BuildPromptResult
     if (message.role !== 'system') {
       continue;
     }
-    const content = message.content ?? '';
+    const content = extractTextContent(message.content);
     if (content !== '') {
       systemContents.push(content);
     }
@@ -285,17 +308,17 @@ export const buildPromptAsync = (options: BuildPromptOptions): BuildPromptResult
       continue;
     }
     if (message.role === 'user') {
-      blocks.push(`[USER]\n${message.content ?? ''}`);
+      blocks.push(`[USER]\n${extractTextContent(message.content)}`);
       continue;
     }
     if (message.role === 'tool') {
-      const toolContent = message.content ?? '';
+      const toolContent = extractTextContent(message.content);
       const toolBody = toolContent === '' ? '(empty)' : toolContent;
       blocks.push(`[TOOL_RESULT id=${message.tool_call_id ?? 'unknown'}]\n${toolBody}`);
       continue;
     }
 
-    const content = message.content ?? '';
+    const content = extractTextContent(message.content);
     const calls = message.tool_calls ?? [];
     if (calls.length > 0) {
       const parts: string[] = [];

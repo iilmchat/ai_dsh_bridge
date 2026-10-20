@@ -33,6 +33,15 @@ export class PowNotSolvedError extends Error {
   }
 }
 
+/** DeepSeek не обработал загруженный файл за отведённое время. */
+export class FileProcessingTimeoutError extends Error {
+  public override readonly name = 'FileProcessingTimeoutError';
+
+  public constructor(message = 'DeepSeek не обработал файл за отведённое время.') {
+    super(message);
+  }
+}
+
 /** DeepSeek вернул бизнес-ошибку (`code !== 0`) в теле ответа. */
 export class DeepSeekApiError extends Error {
   public override readonly name = 'DeepSeekApiError';

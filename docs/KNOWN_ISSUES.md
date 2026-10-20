@@ -435,7 +435,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 
 ---
 
-## Backlog (Planned/In Progress/Done/Deferred)
+## Backlog (Planned/In Progress/Fixed/Done/Deferred)
 
 Идеи развития из [ROADMAP.md](ROADMAP.md). Это **не активные дефекты**:
 они не входят в сводку выше и не блокируют релизы. При старте работы над
@@ -446,7 +446,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 |---|---|---|---|---|
 | KI-1001 | R-06-01 | 🔴 Critical | Done | OCR (Tesseract) через `bash` — реализован в 0.6.0-alpha (S2: few-shot, полный путь + `where tesseract`) |
 | KI-1002 | R-06-02 | 🟠 High | Planned | Локальная vision-модель (Ollama/LLaVA) — описание сцены |
-| KI-1003 | R-06-03 | 🟡 Medium | Deferred | Base64-картинки в DeepSeek Web через CDP — зависит от внешнего API |
+| KI-1003 | R-06-03 | 🟡 Medium | Fixed | Изображения в DeepSeek Web: `upload_file` + `ref_file_ids` при `model_type: default` (S3, 0.6.0-alpha) — детали ниже |
 | KI-1004 | R-06-04 | 🟠 High | In Progress | Инструмент `screenshot` (обёртка `screenshot-desktop`, base64 + путь) |
 | KI-1005 | R-07-01 | 🟠 High | Planned | PoW через `worker_threads` — цель ~150 мс вместо ~500 мс |
 | KI-1006 | R-07-02 | 🟠 High | Planned | Инкрементальный streaming DSML — первый SSE-чанк без полной буферизации |
@@ -459,3 +459,23 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | KI-1013 | R-09-01 | 🟢 Low | Deferred | CDP-fallback, если прямые HTTP перестанут работать из-за WAF |
 | KI-1014 | R-09-02 | 🟢 Low | Deferred | Автообновление PoW-алгоритма при смене `DeepSeekHashV1` |
 | KI-1015 | R-09-03 | 🟢 Low | Deferred | Web UI настройки вместо `pnpm webauth` |
+
+### KI-1003 — как закрыт (S3, 2026-10-20)
+
+Захваты: `docs/captures/upload-file-2026-10-20.http`,
+`docs/captures/chat-completion-vision-2026-10-20.http` (локальные, вне git).
+
+- `POST /api/v0/file/upload_file` — `multipart/form-data`, единственное поле
+  `file` (`filename`, `Content-Type: image/png`); заголовки `x-file-size`,
+  `x-model-type: default`, `x-thinking-enabled: 0`; PoW под
+  `target_path=/api/v0/file/upload_file`. Полей `purpose`/`expires_after`
+  в текущем web-клиенте нет.
+- `GET /api/v0/file/fetch_files?file_ids=<id>` — опрос статуса до
+  `SUCCESS` (PENDING → SUCCESS, таймаут ожидания 30 с); терминальные статусы
+  (`FAILED`, `CONTENT_FILTER`, …) — ошибка upstream.
+- `POST /api/v0/chat/completion` — `ref_file_ids: ["file-…"]`,
+  `model_type: "default"` (не `"vision"`/не `null`); `fork_file_task` при
+  загрузке изображения не вызывается.
+- Реализация: `uploadFileAsync`/`fetchFilesAsync` (`src/deepseek/client.ts`),
+  извлечение `image_url` и загрузка в `src/api/completions.ts`; Prompt Builder
+  собирает только текст (`src/translate/prompt.ts`).
