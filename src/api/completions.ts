@@ -198,7 +198,16 @@ export const registerCompletionsRoute = async (
     // ответе без tool_calls синтезируем минимальный текст.
     if (content === null && toolCalls.length === 0) {
       const hadToolResult = body.messages.some((message) => message.role === 'tool');
-      content = hadToolResult ? 'Готово. Инструмент выполнен.' : 'Готово.';
+      if (hadToolResult) {
+        const lastTool = body.messages.toReversed().find((message) => message.role === 'tool');
+        const toolContent = lastTool?.content;
+        content =
+          typeof toolContent === 'string' && toolContent !== ''
+            ? `Результат: ${toolContent.slice(0, 500)}`
+            : 'Готово. Инструмент выполнен.';
+      } else {
+        content = 'Готово.';
+      }
       request.log.warn('DeepSeek вернул пустой content, синтезирован fallback');
     }
 

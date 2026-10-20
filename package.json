@@ -9,6 +9,8 @@
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "dev:kill": "powershell -Command \"Get-NetTCPConnection -LocalPort 3456 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }\" & pnpm dev",
+    "version": "node -p \"require('./package.json').version\"",
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "webauth": "tsx --env-file-if-exists=.env src/auth/webauth.ts",

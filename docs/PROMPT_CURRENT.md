@@ -57,7 +57,7 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | Каркас | Node.js 22+, TypeScript 6 strict ESM, `tsconfig.json` / `tsconfig.build.json`, Vitest 4, oxlint, pnpm-lock, `LICENSE` (MIT) |
 | `src/index.ts` | Fastify 5, pino, graceful shutdown, loopback `127.0.0.1:PORT` |
 | `GET /health` | `{ status: "ok", version: "0.6.0-alpha", uptime_sec }` |
-| `GET /v1/models` | `deepseek-web-chat`, `deepseek-web-reasoner` (`object: "list"`, `owned_by: "deepseek-web"`) |
+| `GET /v1/models` | `deepseek-web-chat`, `deepseek-web-reasoner`; каждая карточка содержит `capabilities` (`tools`, `function_calling`, `streaming`) для DSH |
 | `POST /v1/chat/completions` | JSON (`stream:false`) и SSE (`stream:true`): Zod → auth → Prompt Builder → DeepSeek → `assembleTextFromEvents` → DSML → JSON/чанки с `tool_calls`; usage по `include_usage` |
 | `src/config.ts` | Zod-валидация окружения, значения по умолчанию, раскрытие `~` |
 | `docs/captures/` | Захваты 2026-10-19: `users/current`, `create_pow_challenge`, `chat/completion`, SSE; секреты `<REDACTED>`, вне git |
@@ -65,7 +65,7 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | `src/deepseek/deepseek-hash.ts` | DeepSeekHashV1: SHA3-спonge, KECCAK-p[1600,23]; async-перебор nonce с уступкой event loop |
 | `src/deepseek/pow.ts` | `solvePowAsync`, base64 `x-ds-pow-response` (реальный challenge решён за ~570 мс) |
 | `src/deepseek/client.ts` | `createChatSessionAsync` (`/chat_session/create`), PoW-challenge под `/api/v0/chat/completion`, SSE-парсер JSON Patch, ретраи `40301`, `AuthExpiredError`, `validateSessionAsync`, `safeBodyPreview` |
-| `src/translate/prompt.ts` | Prompt Builder: DSML-инструкция, `toolChoice`, инструкции про `tool`-результат, `bash`, файлы, вывод команд, cwd; few-shot: мышь (pyautogui), скриншот (PowerShell); `PromptValidationError` |
+| `src/translate/prompt.ts` | Prompt Builder: DSML-инструкция, `toolChoice`, инструкции про `tool`-результат, `bash`, файлы, вывод команд, cwd; few-shot: мышь (pyautogui), скриншот (PowerShell), OCR (tesseract); `PromptValidationError` |
 | `src/translate/dsml-parser.ts` | Non-streaming DSML-парсер: `{ text, tool_calls, warnings }`, нормализация pipe-маркеров, fail-safe (DESIGN § 5.2), финальная очистка `text` от маркеров (0.5.4) |
 | `src/translate/assemble.ts` | `assembleTextFromEvents`: текст из SET/APPEND/text + `accumulated_token_usage` из BATCH |
 | `src/translate/sse-writer.ts` | `writeOpenAiSse`: OpenAI SSE-чанки; `id`/`name` только в первом `tool_calls`-чанке, continuation без них, `[DONE]`, usage |
@@ -73,7 +73,7 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | `src/api/completions.schema.ts` | Zod-схема запроса (strict): model, messages, tools, tool_choice, stream, stream_options, top_p, penalties, stop, store, max_completion_tokens, n, seed, response_format, user, parallel_tool_calls |
 | `src/translate/types.ts` | `OpenAiMessage`, `OpenAiToolCall`, `OpenAiTool`, `ChatCompletionRequest/Response` (L1/L2) |
 | `src/auth/webauth.ts` | Chrome CDP :9222, извлечение `ds_session_id`/`aws-waf-token`/Bearer, `auth.json` 0600, таймаут 5 мин |
-| `test/` | **119 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream) |
+| `test/` | **123 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream, api-models) |
 | `scripts/e2e-deepseek.ts` | Живой e2e (`pnpm e2e:deepseek`): сессия → PoW → SSE → сборка текста, лог в `docs/captures/` с `<REDACTED>` |
 | `scripts/e2e-tools.ts` | Диагностика DSML (`pnpm e2e:tools`): prompt+tools → DeepSeek → `parseDsml`; `--prompt-only`, лог `e2e-tools-*.log` |
 | `.oxlintrc.json` | Конфиг oxlint: правила из RULES § 1/§ 4, `any` и `floating-promises` запрещены (KI-008 Fixed) |
@@ -202,13 +202,13 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 
 | Метрика | Значение | Источник |
 |---|---|---|
-| Backend-тесты | **119** | `test/*.test.ts` (…/api-completions, api-completions-stream) |
+| Backend-тесты | **123** | `test/*.test.ts` (…/api-completions, api-models) |
 | Open KI | **2** | `docs/KNOWN_ISSUES.md` |
 | Всего KI | 16 (2 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
 | Версия | 0.6.0-alpha | `package.json` |
 | Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
-| Покрытие тестами | 119 тестов; живой e2e DSH подтверждён вручную | — |
+| Покрытие тестами | 123 тестов; живой e2e DSH подтверждён вручную | — |
 
 Правило: если в ответе приводится метрика (число тестов, Open KI, версия),
 она должна совпадать с этим разделом. Расхождение — повод обновить

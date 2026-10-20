@@ -188,6 +188,18 @@ ${DSML_CALLS_OPEN}
   </｜DSML｜invoke>
 ${DSML_CALLS_CLOSE}
 
+Пример: если пользователь просит «прочитай текст со скриншота», используй
+bash с полным путём к tesseract (на Windows):
+
+${DSML_CALLS_OPEN}
+  <｜DSML｜invoke name="bash">
+    <｜DSML｜parameter name="command" string="true">"C:\\Program Files\\Tesseract-OCR\\tesseract.exe" screen.png stdout -l rus+eng</｜DSML｜parameter>
+  </｜DSML｜invoke>
+${DSML_CALLS_CLOSE}
+
+Если tesseract не найден по этому пути, проверь \`where tesseract\` или
+\`Get-Command tesseract\` и используй найденный путь.
+
 Важно: если результат инструмента — это файл (изображение, документ, архив),
 ответь текстом с путём к сохранённому файлу (например, «Файл сохранён:
 C:\\path\\to\\file.png»). Не пытайся вставить файл в чат или описать его

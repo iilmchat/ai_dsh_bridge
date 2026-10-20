@@ -38,7 +38,7 @@
     "Function": ["arguments", "name"],
     "Usage": ["completion_tokens", "prompt_tokens", "total_tokens"],
     "ModelsResponse": ["data", "object"],
-    "Model": ["created", "id", "object", "owned_by"]
+    "Model": ["capabilities", "created", "id", "object", "owned_by"]
   },
   "sse": {
     "chat.completion.chunk": {

@@ -12,7 +12,14 @@
 
 ## [Unreleased]
 
-Изменений после 0.6.0-alpha нет.
+### Added
+
+- `GET /v1/models` отдаёт `capabilities` (`tools`, `function_calling`,
+  `streaming`) в каждой карточке модели — DSH видит поддержку инструментов
+  и передаёт `tools` в запросах (маршрут вынесен в `src/api/models.ts`).
+- `pnpm dev:kill` — находит процесс на порту 3456, останавливает и
+  запускает `pnpm dev`; `pnpm run version` — вывод версии из package.json
+  (`pnpm version` зарезервирована pnpm).
 
 ---
 
@@ -22,12 +29,16 @@
 
 - Few-shot для скриншота через PowerShell (`CopyFromScreen`,
   `screenshot.png`) — S1 Vision: модель делает скриншот через `bash`.
+- Few-shot для OCR через `tesseract` (`"C:\Program Files\Tesseract-OCR\tesseract.exe" screen.png stdout -l rus+eng`) — S2 Vision: модель распознаёт текст со скриншота через `bash`, проверяя `where tesseract` при другом пути.
 - `docs/DESIGN_V06_VISION.md` дополнен разделами 3 «Технические срезы»
   (screenshot, OCR, передача изображений, Prompt Builder, конфигурация) и
   4 «План работ» (S1–S5); R-06-01/R-06-04 переведены в In Progress.
 
 ### Changed
 
+- Fallback пустого `content` теперь возвращает `Результат: <последний
+  tool-результат>` (до 500 символов), а не только «Готово» — вывод
+  инструмента не теряется, даже если модель промолчала.
 - Диагностика `role:"tool"`: Prompt Builder помечает пустой tool-результат
   как `(empty)`; в `POST /v1/chat/completions` добавлен opt-in лог
   `DEBUG_MESSAGES=1` (роль, длина/превью content, tool_call_id,

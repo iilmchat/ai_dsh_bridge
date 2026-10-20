@@ -9,27 +9,11 @@
  */
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerCompletionsRoute } from './api/completions.js';
+import { registerModelsRoute } from './api/models.js';
 import { loadConfig, type BridgeConfig } from './config.js';
 
 /** Версия каркаса; синхронизируется с `package.json` вручную. */
 const APP_VERSION = '0.6.0-alpha';
-
-/** Идентификаторы моделей, доступных DSH через шлюз. */
-const MODEL_IDS = ['deepseek-web-chat', 'deepseek-web-reasoner'] as const;
-
-/** Описание модели в формате OpenAI `GET /v1/models`. */
-interface ModelCard {
-  readonly id: string;
-  readonly object: 'model';
-  readonly created: number;
-  readonly owned_by: string;
-}
-
-/** Ответ `GET /v1/models`. */
-interface ModelsListResponse {
-  readonly object: 'list';
-  readonly data: readonly ModelCard[];
-}
 
 /** Ответ `GET /health`. */
 interface HealthResponse {
@@ -55,16 +39,7 @@ export const buildServer = async (): Promise<{
     uptime_sec: Math.round(process.uptime()),
   }));
 
-  app.get('/v1/models', (): ModelsListResponse => ({
-    object: 'list',
-    data: MODEL_IDS.map((id) => ({
-      id,
-      object: 'model' as const,
-      created: 0,
-      owned_by: 'deepseek-web',
-    })),
-  }));
-
+  registerModelsRoute(app);
   await registerCompletionsRoute(app);
 
   return { app, config };

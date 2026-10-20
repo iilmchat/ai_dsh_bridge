@@ -58,6 +58,11 @@ pnpm webauth
 pnpm dev
 ```
 
+Если старый процесс завис на порту `3456`: `pnpm dev:kill` — найдёт PID,
+остановит его и запустит `pnpm dev` заново. Текущая версия:
+`pnpm run version` (команда `pnpm version` зарезервирована pnpm под
+semver-bump).
+
 Шлюз слушает `http://localhost:3456`. Проверка:
 
 ```powershell

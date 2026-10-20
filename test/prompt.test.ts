@@ -166,6 +166,14 @@ describe('buildPromptAsync', () => {
     expect(result.prompt).toContain('System.Windows.Forms');
   });
 
+  it('содержит few-shot для OCR через tesseract', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('tesseract');
+    expect(result.prompt).toContain('stdout -l rus+eng');
+    expect(result.prompt).toContain('Program Files\\Tesseract-OCR\\tesseract.exe');
+    expect(result.prompt).toContain('where tesseract');
+  });
+
   it('учит возвращать путь к файлу в текстовом ответе', () => {
     const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
     expect(result.prompt).toContain('Файл сохранён:');
