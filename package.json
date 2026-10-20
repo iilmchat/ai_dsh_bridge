@@ -1,0 +1,37 @@
+{
+  "name": "ai-dsh-bridge",
+  "version": "0.3.1",
+  "description": "OpenAI-compatible gateway for DeepSeek Harness via chat.deepseek.com",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "webauth": "tsx --env-file-if-exists=.env src/auth/webauth.ts",
+    "e2e:deepseek": "tsx --env-file-if-exists=.env scripts/e2e-deepseek.ts",
+    "e2e:tools": "tsx --env-file-if-exists=.env scripts/e2e-tools.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "lint": "oxlint --type-aware src/ test/ scripts/",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.0",
+    "fastify": "^5.0.0",
+    "undici": "^8.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/chrome-remote-interface": "^0.34.0",
+    "@types/node": "^22.0.0",
+    "oxlint": "^1.0.0",
+    "oxlint-tsgolint": "^7.0.2004",
+    "tsx": "^4.0.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.0.0"
+  }
+}

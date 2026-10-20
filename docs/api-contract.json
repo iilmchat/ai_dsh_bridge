@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "responses": {
+    "ChatCompletionResponse": [
+      "choices",
+      "created",
+      "id",
+      "model",
+      "object",
+      "usage"
+    ],
+    "Choice": ["finish_reason", "index", "message"],
+    "Message": ["content", "role", "tool_calls"],
+    "ToolCall": ["function", "id", "type"],
+    "Function": ["arguments", "name"],
+    "Usage": ["completion_tokens", "prompt_tokens", "total_tokens"],
+    "ModelsResponse": ["data", "object"],
+    "Model": ["created", "id", "object", "owned_by"]
+  },
+  "sse": {
+    "chat.completion.chunk": {
+      "fields": ["choices", "created", "id", "model", "object"],
+      "delta_fields": ["content", "role", "tool_calls"],
+      "tool_call_delta_fields": ["function", "id", "index", "type"],
+      "tool_call_function_delta_fields": ["arguments", "name"]
+    }
+  }
+}
