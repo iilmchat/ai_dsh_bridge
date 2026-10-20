@@ -19,9 +19,9 @@
 
 | Статус | Количество | Записи |
 |---|---|---|
-| Open | 3 | KI-007, KI-014, KI-015 |
+| Open | 2 | KI-014, KI-015 |
 | In Progress | 0 | — |
-| Fixed | 10 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-008, KI-009, KI-011, KI-012, KI-016 |
+| Fixed | 11 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-007, KI-008, KI-009, KI-011, KI-012, KI-016 |
 | Documented | 1 | KI-001 |
 | Deferred | 1 | KI-010 |
 | Won't Fix | 1 | KI-013 |
@@ -48,7 +48,7 @@
 | 4 | Prompt Builder (DSML injection) | KI-005 — Fixed в 0.5.0 |
 | 5 | DSML Parser | KI-005 — Fixed в 0.5.0 |
 | 6 | SSE Streaming (`id`/`name` только в первом чанке) | KI-006 — Fixed в 0.5.0; e2e — KI-007 |
-| 7 | Полный цикл tool_call | KI-002, KI-005, KI-006 |
+| 7 | Полный цикл tool_call | KI-007 — Fixed в 0.5.0 (живой DSH e2e: bash выполнен, результат возвращён) |
 | 8 | Устойчивость (edge cases, retry, логирование) | KI-004, KI-006 |
 
 ---
@@ -134,18 +134,18 @@
   usage-чанк; тесты в `test/api-completions-stream.test.ts`.
 - **Связанные:** KI-002, KI-005, KI-007, `docs/api-contract.json`
 
-### KI-007 — Нет e2e-теста шлюза (DSH ↔ шлюз) (Open)
-- **Приоритет:** 🟠 High | **Статус:** Open | **Обнаружено:** 2026-10-19
-- **Файлы:** `test/`, `vitest.config.ts`, `package.json`
-- **Описание:** Unit-тесты есть (105, включая парсер, SSE и роут), но нет
-  сквозного e2e-теста «DSH → шлюз → DeepSeek → tool_call → результат»;
-  `pnpm test` всё ещё содержит `--passWithNoTests`, поэтому нулевой прогон
-  формально зелёный.
-- **Влияние:** контракт с реальным DSH не проверен автоматически; регрессии
-  во взаимодействии с DSH может поймать только ручной smoke.
-- **План:** Этап 7 — e2e-тест с моком DeepSeek (или записывающим прокси) +
-  ручной smoke с DSH; убрать `--passWithNoTests` из основного скрипта.
-- **Связанные:** KI-002, KI-005, KI-006
+### KI-007 — Нет e2e-теста шлюза (DSH ↔ шлюз) (Fixed)
+- **Приоритет:** 🟠 High | **Статус:** Fixed | **Обнаружено:** 2026-10-19
+- **Исправлено в:** v0.5.0 (2026-10-20)
+- **Файлы:** `test/`, `scripts/`, `docs/captures/`
+- **Описание:** Unit-тесты были, но отсутствовала сквозная проверка
+  «DSH → шлюз → DeepSeek → tool_call → результат → второй turn».
+- **Проверено:** живой e2e DSH ↔ шлюз подтверждён — DSH подключился как
+  Custom Provider (`GET /v1/models` → 200), отправил `POST
+  /v1/chat/completions` (`stream:true`), выполнил `bash ls -la` через
+  `tool_calls` (SSE с корректными `id`/`name`), результат вернулся в модель.
+  Проект работает от начала до конца.
+- **Связанные:** KI-002, KI-005, KI-006, DESIGN § 5.3
 
 ### KI-008 — Нет конфигурации oxlint (`.oxlintrc.json`) (Fixed)
 - **Приоритет:** 🟡 Medium | **Статус:** Fixed | **Обнаружено:** 2026-10-19
@@ -423,4 +423,4 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.3.0 | 2026-10-19 | KI-016 → Fixed (живой e2e подтвердил структуру `chat_session/create`); добавлен Prompt Builder (`src/translate/`), тестов 66 |
 | 0.3.1 | 2026-10-20 | Добавлен non-streaming DSML-парсер (`src/translate/dsml-parser.ts`), тестов 84; новых KI нет |
 | 0.4.0 | 2026-10-20 | `POST /v1/chat/completions` (non-streaming): Zod, сборка текста, DSML → `tool_calls`; KI-002 остаётся Open из-за `stream:true`; тестов 99 |
-| 0.5.0 | 2026-10-20 | K2: `stream:true` + `writeOpenAiSse`; KI-002/KI-005/KI-006 → Fixed; тестов 105; KI-007 переформулирован (нужен e2e шлюза) |
+| 0.5.0 | 2026-10-20 | K2: `stream:true` + `writeOpenAiSse`; KI-002/KI-005/KI-006 → Fixed; живой e2e DSH ↔ шлюз подтверждён (bash через tool_calls), KI-007 → Fixed; тестов 107 |

@@ -62,8 +62,8 @@ git switch -c "release/v$Version"
 - [ ] `pnpm install --frozen-lockfile` — без обновления lock-файла.
 - [ ] `pnpm lint` — без ошибок (oxlint, type-aware).
 - [ ] `pnpm typecheck` — `tsc --noEmit`, без ошибок.
-- [ ] `pnpm test` — зелёный; при отсутствии тестов есть письменное
-      подтверждение (см. проверку ниже; KI-007).
+- [ ] `pnpm test` — зелёный; тестовые файлы существуют (сейчас 9 suite,
+      включая SSE-контракт `api-completions-stream.test.ts`).
 - [ ] `pnpm build` — без ошибок и **без warning-ов** TypeScript.
 - [ ] Smoke-проверка запущенного фасада (§ 2.5).
 
@@ -89,12 +89,12 @@ if ($warnings.Count -gt 0) {
     throw "pnpm build: $($warnings.Count) warning(s)"
 }
 
-# 2.4. Проверка, что тесты действительно существуют:
-# скрипт test содержит --passWithNoTests, поэтому зелёный прогон сам по себе
-# не доказывает работоспособность (KI-007).
+# 2.4. Проверка, что тесты действительно существуют.
+# С 0.5.0 в test/ есть 9 suite; если файлов нет — это регрессия, релиз
+# блокируется (зелёный прогон с --passWithNoTests ничего не доказывает).
 $testFiles = @(Get-ChildItem test -Filter '*.test.ts' -File -ErrorAction SilentlyContinue)
 if ($testFiles.Count -eq 0) {
-    Write-Warning 'В test/ нет *.test.ts — статус KI-007 подтверждён, релиз допускается только как scaffold'
+    Write-Warning 'В test/ нет *.test.ts — тестовое покрытие отсутствует, релиз блокируется'
 } else {
     Write-Host "Найдено тестовых файлов: $($testFiles.Count)"
 }

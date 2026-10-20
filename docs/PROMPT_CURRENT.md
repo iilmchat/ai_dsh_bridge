@@ -84,27 +84,25 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 `pnpm webauth`, клиент DeepSeek с PoW (0.2.0), Prompt Builder (0.3.0),
 DSML-парсер (0.3.1) и `POST /v1/chat/completions` в обоих режимах (0.4.0
 JSON, 0.5.0 SSE) готовы; живой e2e DeepSeek проходит (`[8] E2E OK`).
-Не реализовано: e2e-тест «DSH ↔ шлюз» (KI-007), CDP-fallback транспорта,
-точный учёт prompt/completion-токенов (DeepSeek отдаёт только
-`accumulated_token_usage`). WAF-заголовки `x-hif-*` не нужны (KI-013
+Не реализовано: CDP-fallback транспорта, точный учёт
+prompt/completion-токенов (DeepSeek отдаёт только
+`accumulated_token_usage`), автоматический e2e-тест DSH (живой e2e уже
+подтверждён вручную). WAF-заголовки `x-hif-*` не нужны (KI-013
 Won't Fix). Ссылки на этапы — в § 6.
 
 ### 2.3. Состояние реестра проблем (актуально на 2026-10-20)
 
-Всего в реестре **16** записей: **3 Open**, 10 Fixed (KI-002 — SSE-роут,
+Всего в реестре **16** записей: **2 Open**, 11 Fixed (KI-002 — SSE-роут,
 KI-003 — webauth, KI-004 — клиент+PoW, KI-005 — слой трансляции,
-KI-006 — SSE-writer, KI-008 — `.oxlintrc.json`, KI-009 — `.env`,
-KI-011 — `LICENSE`, KI-012 — `--env-file-if-exists`, KI-016 — живой e2e
-подтвердил `chat_session/create`), 1 Documented (KI-001 — шаблон),
-1 Deferred (KI-010), 1 Won't Fix (KI-013 — WAF не обязателен). Открытые:
-KI-007, KI-014, KI-015. Полные описания и планы —
+KI-006 — SSE-writer, KI-007 — живой DSH e2e, KI-008 — `.oxlintrc.json`,
+KI-009 — `.env`, KI-011 — `LICENSE`, KI-012 — `--env-file-if-exists`,
+KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documented
+(KI-001 — шаблон), 1 Deferred (KI-010), 1 Won't Fix (KI-013 — WAF не
+обязателен). Открытые: KI-014, KI-015. Полные описания и планы —
 [docs/KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 | KI | Приоритет | Суть |
 |---|---|---|
-| KI-007 | 🟠 High | Нет e2e-теста «DSH ↔ шлюз»; `--passWithNoTests` ещё в скрипте |
-| KI-014 | 🟡 Medium | PoW-решатель на JS ~570 мс (цель 100–500 мс) |
-| KI-015 | 🟢 Low | `webauth`: ветка подключения к уже запущенному Chrome не проверена вживую |
 | KI-014 | 🟡 Medium | PoW-решатель на JS ~570 мс (цель 100–500 мс) |
 | KI-015 | 🟢 Low | `webauth`: ветка подключения к уже запущенному Chrome не проверена вживую |
 
@@ -204,12 +202,12 @@ KI-007, KI-014, KI-015. Полные описания и планы —
 | Метрика | Значение | Источник |
 |---|---|---|
 | Backend-тесты | **107** | `test/*.test.ts` (…/api-completions, api-completions-stream) |
-| Open KI | **3** | `docs/KNOWN_ISSUES.md` |
-| Всего KI | 16 (3 Open, 10 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
+| Open KI | **2** | `docs/KNOWN_ISSUES.md` |
+| Всего KI | 16 (2 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
 | Версия | 0.5.0 | `package.json` |
-| Готовность этапов DESIGN § 10 | Этапы 0–6 закрыты; остались 7 (сквозной цикл DSH) и 8 (устойчивость) | § 6 |
-| Покрытие тестами | 105 тестов; нет e2e-теста «DSH ↔ шлюз» | KI-007 |
+| Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
+| Покрытие тестами | 107 тестов; живой e2e DSH подтверждён вручную | — |
 
 Правило: если в ответе приводится метрика (число тестов, Open KI, версия),
 она должна совпадать с этим разделом. Расхождение — повод обновить
@@ -228,15 +226,14 @@ PROMPT_CURRENT тем же коммитом.
 | 4. Prompt Builder | Внедрение `tools` как DSML | Prompt с DSML-инструкцией | ✅ Prompt Builder (0.3.0) | — |
 | 5. DSML Parser | Парсинг полного ответа → `tool_calls` | `tool_calls` в JSON/SSE | ✅ Non-streaming парсер (0.3.1), используется в SSE после буферизации | — |
 | 6. SSE Streaming | SSE-чанки (без пустых `id`/`name`) | DSH выполняет инструмент | ✅ `writeOpenAiSse` (0.5.0) | — |
-| 7. Полный цикл | DSH → tool_call → bash → результат → второй turn | Сквозной сценарий работает | ⬜ Не проверен (нужен e2e шлюза) | KI-007 |
+| 7. Полный цикл | DSH → tool_call → bash → результат → второй turn | Сквозной сценарий работает | ✅ Живой DSH e2e: `bash ls -la` выполнен, результат возвращён в модель (0.5.0) | — |
 | 8. Устойчивость | Edge cases DSML, retry, логирование | Стабильная работа | ⬜ Не начат | KI-004, KI-014 |
 
 **Порядок работ:** этапы выполняются последовательно по DESIGN § 10; шаг
-дробится на коммиты (§ 4.12). Этапы 2–3 закрыты в 0.2.0, Prompt Builder —
-0.3.0, парсер — 0.3.1, JSON-чат — 0.4.0, SSE-чат — 0.5.0. Ближайший шаг —
-**Этап 7**: e2e-тест «DSH ↔ шлюз» (tool_call → результат → второй turn),
-затем устойчивость (retry/edge cases, KI-014). При выборе задачи опирайся на
-критичность KI.
+дробится на коммиты (§ 4.12). Этапы 0–7 закрыты: 2–3 в 0.2.0, Prompt
+Builder — 0.3.0, парсер — 0.3.1, JSON-чат — 0.4.0, SSE-чат и живой DSH
+e2e — 0.5.0. Ближайший шаг — **Этап 8**: устойчивость (retry/edge cases,
+KI-014, логирование). При выборе задачи опирайся на критичность KI.
 `UNKNOWN_TOOL` из-за пустых `id`/`name` — дефект SSE-слоя (KI-006);
 `UNKNOWN_TOOL` для действительно неизвестного инструмента — штатное
 поведение DSH (DESIGN § 8.2), его не «чинят» в шлюзе.

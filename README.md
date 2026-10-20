@@ -9,8 +9,9 @@ SSE-стримингом — без `UNKNOWN_TOOL`.
 > **Статус: v0.5.0 (scaffold).** Работают `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
 > `POST /v1/chat/completions` в обоих режимах — `stream: false` (JSON) и
-> `stream: true` (OpenAI SSE с `tool_calls`). DSH может подключаться как
-> Custom Provider; сквозной tool-call цикл проверяется (KI-007)
+> `stream: true` (OpenAI SSE с `tool_calls`). DSH подключается как
+> Custom Provider; сквозной tool-call цикл подтверждён живым e2e DSH
+> (`bash` выполнен, результат возвращён в модель)
 > (см. [DESIGN § 10](docs/DESIGN.md#10-этапы-реализации)).
 
 > ⚠️ **Использование веб-сессии DeepSeek может нарушать условия сервиса и
