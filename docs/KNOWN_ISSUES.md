@@ -431,11 +431,11 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.5.5 | 2026-10-20 | Инструкция для файловых результатов (отвечать путём к файлу); 115 тестов |
 | 0.5.6 | 2026-10-20 | cwd awareness в Prompt Builder (`pwd`/`cd`, не предполагать корень); 116 тестов |
 | 0.5.7 | 2026-10-20 | Инструкция показывать вывод инструментов (`pwd`/`ls`/`cat`), не отвечать «Готово»; 117 тестов |
-| 0.6.0-alpha | 2026-10-20 | S1/S2 Vision: few-shot скриншота через PowerShell и OCR через `tesseract` (полный путь + `where tesseract`); fallback показывает последний tool-результат; 121 тестов |
+| 0.6.0-alpha | 2026-10-20 | S1/S2 Vision: few-shot скриншота через PowerShell и OCR через `tesseract` (полный путь + `where tesseract`); fallback показывает последний tool-результат; 123 теста |
 
 ---
 
-## Backlog (Planned/Deferred)
+## Backlog (Planned/In Progress/Done/Deferred)
 
 Идеи развития из [ROADMAP.md](ROADMAP.md). Это **не активные дефекты**:
 они не входят в сводку выше и не блокируют релизы. При старте работы над
@@ -444,7 +444,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 
 | ID | Roadmap | Приоритет | Статус | Кратко |
 |---|---|---|---|---|
-| KI-1001 | R-06-01 | 🔴 Critical | In Progress | OCR (Tesseract) через `bash` — текст со скриншота без vision-модели |
+| KI-1001 | R-06-01 | 🔴 Critical | Done | OCR (Tesseract) через `bash` — реализован в 0.6.0-alpha (S2: few-shot, полный путь + `where tesseract`) |
 | KI-1002 | R-06-02 | 🟠 High | Planned | Локальная vision-модель (Ollama/LLaVA) — описание сцены |
 | KI-1003 | R-06-03 | 🟡 Medium | Deferred | Base64-картинки в DeepSeek Web через CDP — зависит от внешнего API |
 | KI-1004 | R-06-04 | 🟠 High | In Progress | Инструмент `screenshot` (обёртка `screenshot-desktop`, base64 + путь) |

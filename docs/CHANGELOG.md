@@ -21,6 +21,13 @@
   запускает `pnpm dev`; `pnpm run version` — вывод версии из package.json
   (`pnpm version` зарезервирована pnpm).
 
+### Changed
+
+- `docs/ROADMAP.md` v0.6.0: S1 (`screenshot`) и S2 (OCR) переведены в
+  Done, S3 (`ref_file_ids`) и S4 (LLaVA) — Todo; закрыт backlog-KI-1001
+  (OCR): реализован few-shot `bash` + `tesseract` (полный путь,
+  `where tesseract`), R-06-01 → Done.
+
 ---
 
 ## [0.6.0-alpha] — 2026-10-20
