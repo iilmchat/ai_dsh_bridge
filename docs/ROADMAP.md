@@ -23,7 +23,7 @@
 
 | Версия | Тема | Приоритет | Статус | Ключевые ID |
 |---|---|---|---|---|
-| v0.6.0 | Vision & Multimodal | 🔴 Critical для агента | Planned | R-06-01…R-06-04 |
+| v0.6.0 | Vision & Multimodal | 🔴 Critical для агента | In Progress (S1/S2) | R-06-01…R-06-04 |
 | v0.7.0 | Performance & Reliability | 🟠 High | Planned | R-07-01…R-07-04 |
 | v0.8.0 | Ecosystem | 🟡 Medium | Planned | R-08-01…R-08-04 |
 | v0.9.0 | Advanced | 🟢 Low | Deferred | R-09-01…R-09-03 |
@@ -40,13 +40,15 @@
 **Результат этапа:** задача «сделай скриншот и опиши, что на экране»
 выполняется от начала до конца; изображение проходит через OCR или
 локальную vision-модель, а текст попадает в prompt DeepSeek.
+**Статус:** In Progress — S1 (`screenshot`) и S2 (OCR), см.
+[DESIGN_V06_VISION.md](DESIGN_V06_VISION.md) § 4.
 
 | ID | Фича | Приоритет | Статус | Описание |
 |---|---|---|---|---|
-| R-06-01 | OCR (Tesseract) | 🔴 Critical | Planned | Fallback для «зрения» без vision-модели: модель через `bash` запускает `tesseract screenshot.png stdout` и получает текст. Работает локально, быстро, только текст. |
+| R-06-01 | OCR (Tesseract) | 🔴 Critical | In Progress | Fallback для «зрения» без vision-модели: модель через `bash` запускает `tesseract screenshot.png stdout` и получает текст. Работает локально, быстро, только текст. |
 | R-06-02 | Локальная vision-модель (Ollama/LLaVA) | 🟠 High | Planned | Агент делает скриншот, отправляет в LLaVA через локальный HTTP, получает описание и использует его в ответе. Нужны GPU/память и модель. |
 | R-06-03 | Base64-картинки в DeepSeek Web | 🟡 Medium | Deferred | Через CDP-fallback, если DeepSeek Web API начнёт поддерживать `ref_file_ids` для изображений. Зависит от внешнего API. |
-| R-06-04 | Инструмент `screenshot` | 🟠 High | Planned | Своя обёртка над `screenshot-desktop` (Node.js), сразу возвращает base64 и путь — без парсинга вывода `bash`. |
+| R-06-04 | Инструмент `screenshot` | 🟠 High | In Progress | Своя обёртка над `screenshot-desktop` (Node.js), сразу возвращает base64 и путь — без парсинга вывода `bash`. |
 
 **Критерии готовности v0.6.0:** скриншот → OCR/LLaVA → текст в prompt;
 тест на mock vision-провайдера; документация и `DESIGN_V06_VISION.md`

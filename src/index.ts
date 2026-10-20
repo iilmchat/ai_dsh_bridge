@@ -1,7 +1,7 @@
 /**
  * AI DSH Bridge — точка входа L1 (OpenAI Facade).
  *
- * На этапе v0.5.7 работают:
+ * На этапе v0.6.0-alpha работают:
  * - `GET /health` — проверка живости;
  * - `GET /v1/models` — список моделей для Custom Provider DSH;
  * - `POST /v1/chat/completions` — чат в режимах `stream: false` и
@@ -12,7 +12,7 @@ import { registerCompletionsRoute } from './api/completions.js';
 import { loadConfig, type BridgeConfig } from './config.js';
 
 /** Версия каркаса; синхронизируется с `package.json` вручную. */
-const APP_VERSION = '0.5.7';
+const APP_VERSION = '0.6.0-alpha';
 
 /** Идентификаторы моделей, доступных DSH через шлюз. */
 const MODEL_IDS = ['deepseek-web-chat', 'deepseek-web-reasoner'] as const;

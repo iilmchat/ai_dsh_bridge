@@ -159,6 +159,13 @@ describe('buildPromptAsync', () => {
     expect(result.prompt).toContain('<｜DSML｜tool_calls>');
   });
 
+  it('содержит few-shot для скриншота через PowerShell', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('screenshot.png');
+    expect(result.prompt).toContain('CopyFromScreen');
+    expect(result.prompt).toContain('System.Windows.Forms');
+  });
+
   it('учит возвращать путь к файлу в текстовом ответе', () => {
     const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
     expect(result.prompt).toContain('Файл сохранён:');

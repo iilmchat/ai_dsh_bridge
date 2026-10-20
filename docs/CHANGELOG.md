@@ -12,6 +12,20 @@
 
 ## [Unreleased]
 
+Изменений после 0.6.0-alpha нет.
+
+---
+
+## [0.6.0-alpha] — 2026-10-20
+
+### Added
+
+- Few-shot для скриншота через PowerShell (`CopyFromScreen`,
+  `screenshot.png`) — S1 Vision: модель делает скриншот через `bash`.
+- `docs/DESIGN_V06_VISION.md` дополнен разделами 3 «Технические срезы»
+  (screenshot, OCR, передача изображений, Prompt Builder, конфигурация) и
+  4 «План работ» (S1–S5); R-06-01/R-06-04 переведены в In Progress.
+
 ### Changed
 
 - Диагностика `role:"tool"`: Prompt Builder помечает пустой tool-результат

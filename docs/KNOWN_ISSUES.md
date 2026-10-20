@@ -1,8 +1,8 @@
 # Известные проблемы AI DSH Bridge
 
-**Версия реестра:** 0.5.7
+**Версия реестра:** 0.6.0-alpha
 **Дата последнего обновления:** 2026-10-20
-**Статус проекта:** v0.5.7 (scaffold)
+**Статус проекта:** v0.6.0-alpha (scaffold)
 
 Формат: `KI-XXX` — название, приоритет, статус, файлы.
 Приоритеты: 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low
@@ -431,6 +431,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.5.5 | 2026-10-20 | Инструкция для файловых результатов (отвечать путём к файлу); 115 тестов |
 | 0.5.6 | 2026-10-20 | cwd awareness в Prompt Builder (`pwd`/`cd`, не предполагать корень); 116 тестов |
 | 0.5.7 | 2026-10-20 | Инструкция показывать вывод инструментов (`pwd`/`ls`/`cat`), не отвечать «Готово»; 117 тестов |
+| 0.6.0-alpha | 2026-10-20 | S1 Vision: few-shot скриншота через PowerShell; DESIGN v0.6 §3–4; 119 тестов |
 
 ---
 
@@ -443,10 +444,10 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 
 | ID | Roadmap | Приоритет | Статус | Кратко |
 |---|---|---|---|---|
-| KI-1001 | R-06-01 | 🔴 Critical | Planned | OCR (Tesseract) через `bash` — текст со скриншота без vision-модели |
+| KI-1001 | R-06-01 | 🔴 Critical | In Progress | OCR (Tesseract) через `bash` — текст со скриншота без vision-модели |
 | KI-1002 | R-06-02 | 🟠 High | Planned | Локальная vision-модель (Ollama/LLaVA) — описание сцены |
 | KI-1003 | R-06-03 | 🟡 Medium | Deferred | Base64-картинки в DeepSeek Web через CDP — зависит от внешнего API |
-| KI-1004 | R-06-04 | 🟠 High | Planned | Инструмент `screenshot` (обёртка `screenshot-desktop`, base64 + путь) |
+| KI-1004 | R-06-04 | 🟠 High | In Progress | Инструмент `screenshot` (обёртка `screenshot-desktop`, base64 + путь) |
 | KI-1005 | R-07-01 | 🟠 High | Planned | PoW через `worker_threads` — цель ~150 мс вместо ~500 мс |
 | KI-1006 | R-07-02 | 🟠 High | Planned | Инкрементальный streaming DSML — первый SSE-чанк без полной буферизации |
 | KI-1007 | R-07-03 | 🟠 High | Planned | Ротация/пересоздание `chat_session_id` при 401 без ручного `webauth` |

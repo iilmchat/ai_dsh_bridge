@@ -3,7 +3,7 @@
 **Версия документа:** 1.0.0
 **Дата:** 2026-10-19
 **Синхронизирован с:** [RULES.md](RULES.md) v1.0.0, [DESIGN.md](DESIGN.md) 0.2,
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) 0.5.7, `package.json` v0.5.7.
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) 0.6.0-alpha, `package.json` v0.6.0-alpha.
 **Назначение:** готовый к использованию системный промпт для ассистента
 проекта (человеко- или AI-исполнителя).
 
@@ -43,7 +43,7 @@ CDP/Chrome и протоколом PoW DeepSeek.
 
 ## 2. Статус проекта
 
-**Версия:** v0.5.7 (scaffold), дата релиза 2026-10-20.
+**Версия:** v0.6.0-alpha (scaffold), дата релиза 2026-10-20.
 **Этап:** этапы 0, 2, 3 закрыты; этап 1 — JSON и SSE готовы; этап 4 —
 Prompt Builder; этап 5 — парсер (non-streaming, используется в SSE после
 буферизации); этап 6 — SSE-writer готов; остались этапы 7–8 (сквозной
@@ -56,7 +56,7 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | Документация | DESIGN, ARCHITECTURE, GETTING_STARTED, RULES, KNOWN_ISSUES, CHANGELOG, RELEASES, KI_GITHUB_SYNC, api-contract.json |
 | Каркас | Node.js 22+, TypeScript 6 strict ESM, `tsconfig.json` / `tsconfig.build.json`, Vitest 4, oxlint, pnpm-lock, `LICENSE` (MIT) |
 | `src/index.ts` | Fastify 5, pino, graceful shutdown, loopback `127.0.0.1:PORT` |
-| `GET /health` | `{ status: "ok", version: "0.5.7", uptime_sec }` |
+| `GET /health` | `{ status: "ok", version: "0.6.0-alpha", uptime_sec }` |
 | `GET /v1/models` | `deepseek-web-chat`, `deepseek-web-reasoner` (`object: "list"`, `owned_by: "deepseek-web"`) |
 | `POST /v1/chat/completions` | JSON (`stream:false`) и SSE (`stream:true`): Zod → auth → Prompt Builder → DeepSeek → `assembleTextFromEvents` → DSML → JSON/чанки с `tool_calls`; usage по `include_usage` |
 | `src/config.ts` | Zod-валидация окружения, значения по умолчанию, раскрытие `~` |
@@ -65,7 +65,7 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | `src/deepseek/deepseek-hash.ts` | DeepSeekHashV1: SHA3-спonge, KECCAK-p[1600,23]; async-перебор nonce с уступкой event loop |
 | `src/deepseek/pow.ts` | `solvePowAsync`, base64 `x-ds-pow-response` (реальный challenge решён за ~570 мс) |
 | `src/deepseek/client.ts` | `createChatSessionAsync` (`/chat_session/create`), PoW-challenge под `/api/v0/chat/completion`, SSE-парсер JSON Patch, ретраи `40301`, `AuthExpiredError`, `validateSessionAsync`, `safeBodyPreview` |
-| `src/translate/prompt.ts` | Prompt Builder: DSML-инструкция, `toolChoice`, инструкции про `tool`-результат, `bash`, файлы, вывод команд, cwd (`pwd`/`cd`); few-shot (pyautogui); `PromptValidationError` |
+| `src/translate/prompt.ts` | Prompt Builder: DSML-инструкция, `toolChoice`, инструкции про `tool`-результат, `bash`, файлы, вывод команд, cwd; few-shot: мышь (pyautogui), скриншот (PowerShell); `PromptValidationError` |
 | `src/translate/dsml-parser.ts` | Non-streaming DSML-парсер: `{ text, tool_calls, warnings }`, нормализация pipe-маркеров, fail-safe (DESIGN § 5.2), финальная очистка `text` от маркеров (0.5.4) |
 | `src/translate/assemble.ts` | `assembleTextFromEvents`: текст из SET/APPEND/text + `accumulated_token_usage` из BATCH |
 | `src/translate/sse-writer.ts` | `writeOpenAiSse`: OpenAI SSE-чанки; `id`/`name` только в первом `tool_calls`-чанке, continuation без них, `[DONE]`, usage |
@@ -73,7 +73,7 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | `src/api/completions.schema.ts` | Zod-схема запроса (strict): model, messages, tools, tool_choice, stream, stream_options, top_p, penalties, stop, store, max_completion_tokens, n, seed, response_format, user, parallel_tool_calls |
 | `src/translate/types.ts` | `OpenAiMessage`, `OpenAiToolCall`, `OpenAiTool`, `ChatCompletionRequest/Response` (L1/L2) |
 | `src/auth/webauth.ts` | Chrome CDP :9222, извлечение `ds_session_id`/`aws-waf-token`/Bearer, `auth.json` 0600, таймаут 5 мин |
-| `test/` | **118 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream) |
+| `test/` | **119 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream) |
 | `scripts/e2e-deepseek.ts` | Живой e2e (`pnpm e2e:deepseek`): сессия → PoW → SSE → сборка текста, лог в `docs/captures/` с `<REDACTED>` |
 | `scripts/e2e-tools.ts` | Диагностика DSML (`pnpm e2e:tools`): prompt+tools → DeepSeek → `parseDsml`; `--prompt-only`, лог `e2e-tools-*.log` |
 | `.oxlintrc.json` | Конфиг oxlint: правила из RULES § 1/§ 4, `any` и `floating-promises` запрещены (KI-008 Fixed) |
@@ -197,18 +197,18 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 
 ## 5. Метрики
 
-Актуальны на 2026-10-20 (v0.5.7). Значения не выдумываются — при
+Актуальны на 2026-10-20 (v0.6.0-alpha). Значения не выдумываются — при
 обновлении сверяйся с реестром KI и файловой системой.
 
 | Метрика | Значение | Источник |
 |---|---|---|
-| Backend-тесты | **118** | `test/*.test.ts` (…/api-completions, api-completions-stream) |
+| Backend-тесты | **119** | `test/*.test.ts` (…/api-completions, api-completions-stream) |
 | Open KI | **2** | `docs/KNOWN_ISSUES.md` |
 | Всего KI | 16 (2 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
-| Версия | 0.5.7 | `package.json` |
+| Версия | 0.6.0-alpha | `package.json` |
 | Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
-| Покрытие тестами | 118 тестов; живой e2e DSH подтверждён вручную | — |
+| Покрытие тестами | 119 тестов; живой e2e DSH подтверждён вручную | — |
 
 Правило: если в ответе приводится метрика (число тестов, Open KI, версия),
 она должна совпадать с этим разделом. Расхождение — повод обновить
@@ -218,7 +218,7 @@ PROMPT_CURRENT тем же коммитом.
 
 ## 6. План: этапы 0–8 (DESIGN § 10)
 
-| Этап | Содержание | Результат | Статус v0.5.7 | KI |
+| Этап | Содержание | Результат | Статус v0.6.0-alpha | KI |
 |---|---|---|---|---|
 | 0. Исследование | Захват реального запроса/ответа DeepSeek через DevTools, проверка формата стриминга | `docs/captures/*.http`, `*.sse` | ✅ Захваты 2026-10-19; формат — JSON Patch, не DSML | — |
 | 1. Каркас | Fastify + `/v1/models` + `/v1/chat/completions` | Шлюз отвечает на `/v1/models`; чат JSON и SSE | ✅ JSON+SSE (0.4.0/0.5.0) | — |
@@ -342,6 +342,6 @@ PoW, Web UI). Backlog-идеи ведутся как `KI-1001…KI-1015` в
 
 ---
 
-**Итог:** ты помогаешь довести AI DSH Bridge от scaffold v0.5.7 до
+**Итог:** ты помогаешь довести AI DSH Bridge от scaffold v0.6.0-alpha до
 работающего сквозного сценария «DSH → tool_call → bash → результат →
 второй turn», не нарушая контракт SSE и правила безопасности.

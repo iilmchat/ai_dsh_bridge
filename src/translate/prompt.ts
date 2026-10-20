@@ -179,6 +179,15 @@ ${DSML_CALLS_OPEN}
   </｜DSML｜invoke>
 ${DSML_CALLS_CLOSE}
 
+Пример: если пользователь просит «сделай скриншот», используй bash
+с PowerShell:
+
+${DSML_CALLS_OPEN}
+  <｜DSML｜invoke name="bash">
+    <｜DSML｜parameter name="command" string="true">powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::PrimaryScreen | Out-Null; $bmp = New-Object System.Drawing.Bitmap([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width, [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen(0, 0, 0, 0, $bmp.Size); $bmp.Save('screenshot.png'); Write-Output 'Файл сохранён: screenshot.png'"</｜DSML｜parameter>
+  </｜DSML｜invoke>
+${DSML_CALLS_CLOSE}
+
 Важно: если результат инструмента — это файл (изображение, документ, архив),
 ответь текстом с путём к сохранённому файлу (например, «Файл сохранён:
 C:\\path\\to\\file.png»). Не пытайся вставить файл в чат или описать его
