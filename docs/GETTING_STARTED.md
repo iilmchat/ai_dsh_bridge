@@ -1,10 +1,10 @@
 # AI DSH Bridge — руководство по началу работы
 
-**Версия:** 0.5.5 (scaffold)
+**Версия:** 0.5.7 (scaffold)
 **Дата:** 2026-10-19
 **Связанные документы:** [DESIGN.md](./DESIGN.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [RULES.md](./RULES.md), [KNOWN_ISSUES.md](./KNOWN_ISSUES.md)
 
-> **Что уже работает в v0.5.5.** `GET /health`, `GET /v1/models`,
+> **Что уже работает в v0.5.7.** `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
 > `POST /v1/chat/completions` в обоих режимах: `stream: false` (JSON) и
 > `stream: true` (OpenAI SSE с `tool_calls`).
@@ -13,7 +13,7 @@
 
 ## 0. Матрица готовности шагов
 
-| Шаг руководства | Что проверяет | Статус в v0.5.5 |
+| Шаг руководства | Что проверяет | Статус в v0.5.7 |
 |---|---|---|
 | §1–2. Требования и установка | Node.js 22+, pnpm, зависимости | ✅ доступно |
 | §4. Запуск каркаса | `pnpm dev`, `/health`, `/v1/models` | ✅ доступно |
@@ -133,7 +133,7 @@ pnpm dev
 
 ```text
 {"level":30,"time":1760886000000,"pid":12345,"hostname":"dev","msg":"Server listening at http://127.0.0.1:3456"}
-{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.5.5 listening on http://127.0.0.1:3456"}
+{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.5.7 listening on http://127.0.0.1:3456"}
 ```
 
 Сервер слушает **только loopback** (`127.0.0.1`). Порт берётся из `PORT`
@@ -160,7 +160,7 @@ curl -s http://127.0.0.1:3456/health
 ```json
 {
   "status": "ok",
-  "version": "0.5.5",
+  "version": "0.5.7",
   "uptime_sec": 12
 }
 ```
@@ -190,7 +190,7 @@ curl -s http://127.0.0.1:3456/v1/models
 
 ### 4.4. Проверка `POST /v1/chat/completions` (JSON и SSE)
 
-В v0.5.5 работают оба режима — при наличии `auth.json` (иначе `401`).
+В v0.5.7 работают оба режима — при наличии `auth.json` (иначе `401`).
 
 Non-streaming (`stream: false`):
 
@@ -365,7 +365,7 @@ llm-pi-ai:
 
 ### 6.3. Что смотреть в логах
 
-- старт сервера: `AI DSH Bridge v0.5.5 listening on ...`;
+- старт сервера: `AI DSH Bridge v0.5.7 listening on ...`;
 - `requestId` запроса и модель;
 - статус upstream-ответа и длительность PoW (ориентир 100–500 мс);
 - число распознанных `tool_calls` и `finish_reason`;
@@ -475,7 +475,7 @@ pnpm dev
 
 Все команды — из `package.json`; других CLI-флагов проект не вводит.
 
-| Команда | Что делает | Статус в v0.5.5 |
+| Команда | Что делает | Статус в v0.5.7 |
 |---|---|---|
 | `pnpm dev` | Запуск с `tsx watch --env-file-if-exists=.env` | ✅ |
 | `pnpm build` | Сборка TypeScript (`tsc -p tsconfig.build.json`) | ✅ |

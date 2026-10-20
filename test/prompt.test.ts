@@ -164,4 +164,32 @@ describe('buildPromptAsync', () => {
     expect(result.prompt).toContain('Файл сохранён:');
     expect(result.prompt).toContain('Не пытайся вставить файл в чат');
   });
+
+  it('учит проверять cwd через pwd/cd', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('выполни `pwd` (bash)');
+    expect(result.prompt).toContain('`cd` (PowerShell)');
+    expect(result.prompt).toContain('проверяй cwd');
+  });
+
+  it('требует включать вывод инструмента в ответ', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('обязательно включи');
+    expect(result.prompt).toContain('этот вывод');
+    expect(result.prompt).toContain('Текущая директория:');
+    expect(result.prompt).toContain('Не отвечай');
+    expect(result.prompt).toContain('просто «Готово»');
+  });
+
+  it('tool-результат: сохраняет путь и помечает пустой content', () => {
+    const withPath = buildPromptAsync({
+      messages: [{ role: 'tool', content: 'C:\\path', tool_call_id: 'call_1' }],
+    });
+    expect(withPath.prompt).toContain('[TOOL_RESULT id=call_1]\nC:\\path');
+
+    const empty = buildPromptAsync({
+      messages: [{ role: 'tool', content: '', tool_call_id: 'call_2' }],
+    });
+    expect(empty.prompt).toContain('[TOOL_RESULT id=call_2]\n(empty)');
+  });
 });

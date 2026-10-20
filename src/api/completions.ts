@@ -113,6 +113,24 @@ export const registerCompletionsRoute = async (
     }
     const body = parsed.data;
 
+    // Временная диагностика: включается только DEBUG_MESSAGES=1.
+    if (process.env.DEBUG_MESSAGES === '1') {
+      request.log.info(
+        {
+          messages: body.messages.map((message) => ({
+            role: message.role,
+            contentType: typeof message.content === 'string' ? 'string' : typeof message.content,
+            contentLength: typeof message.content === 'string' ? message.content.length : null,
+            contentPreview:
+              typeof message.content === 'string' ? message.content.slice(0, 150) : null,
+            toolCallId: message.tool_call_id,
+            hasToolCalls: Array.isArray(message.tool_calls) && message.tool_calls.length > 0,
+          })),
+        },
+        'Incoming messages from DSH',
+      );
+    }
+
     let auth: Auth;
     try {
       auth = await loadAuth();

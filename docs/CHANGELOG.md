@@ -12,6 +12,27 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Диагностика `role:"tool"`: Prompt Builder помечает пустой tool-результат
+  как `(empty)`; в `POST /v1/chat/completions` добавлен opt-in лог
+  `DEBUG_MESSAGES=1` (роль, длина/превью content, tool_call_id,
+  наличие tool_calls) для разбора запросов DSH.
+
+---
+
+## [0.5.7] — 2026-10-20
+
+### Changed
+
+- Инструкция показывать вывод инструментов: если результат `bash`
+  содержит данные (`pwd`, `ls`, `cat`), модель обязана включить их в ответ,
+  а не отвечать «Готово».
+
+---
+
+## [0.5.6] — 2026-10-20
+
 ### Added
 
 - `docs/ROADMAP.md` — карта развития v0.6.0–v0.9.0 (Vision, Performance,
@@ -19,6 +40,12 @@
 - `docs/DESIGN_V06_VISION.md` — черновик архитектуры Vision & Multimodal
   (OCR/LLaVA/CDP, гибридный выбор).
 - Backlog `KI-1001…KI-1015` в KNOWN_ISSUES (не входит в сводку активных KI).
+
+### Changed
+
+- cwd awareness в Prompt Builder: модель обязана проверять рабочую
+  директорию (`pwd`/`cd`), а не предполагать корень проекта; добавлена
+  инструкция после файловых результатов.
 
 ---
 
