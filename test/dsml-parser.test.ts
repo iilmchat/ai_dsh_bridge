@@ -172,6 +172,19 @@ describe('parseDsml', () => {
     const result = parseDsml(`${first}\n${second}`);
     expect(result.tool_calls).toHaveLength(2);
   });
+
+  it('обрезает одиночный закрывающий тег из текста', () => {
+    const result = parseDsml('Привет</｜DSML｜tool_calls>');
+    expect(result.text).toBe('Привет');
+    expect(result.tool_calls).toEqual([]);
+  });
+
+  it('вырезает незакрытый invoke целиком (мусор не попадает в text)', () => {
+    const result = parseDsml('<｜DSML｜invoke name="bash">незакрытый');
+    expect(result.text).toBe('');
+    expect(result.tool_calls).toEqual([]);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
 });
 
 describe('parseDsml: уникальность id', () => {

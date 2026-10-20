@@ -192,6 +192,40 @@ describe('POST /v1/chat/completions (K1)', () => {
     expect(response.json().error.type).toBe('invalid_request_error');
   });
 
+  it('200: пустой content после tool-результата → fallback-текст', async () => {
+    const app = await buildApp({
+      sendChat: sendChatWith([]),
+      assembleText: () => Promise.resolve({ text: '', tokenUsage: 0 }),
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: {
+        ...USER_PAYLOAD,
+        messages: [
+          { role: 'user', content: 'создай файл' },
+          { role: 'tool', content: 'file created', tool_call_id: 'call_1' },
+        ],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0].message.content).toBe('Готово. Инструмент выполнен.');
+  });
+
+  it('200: пустой content без tool-результата → «Готово.»', async () => {
+    const app = await buildApp({
+      sendChat: sendChatWith([]),
+      assembleText: () => Promise.resolve({ text: '', tokenUsage: 0 }),
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: USER_PAYLOAD,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0].message.content).toBe('Готово.');
+  });
+
   it('401: auth.json отсутствует', async () => {
     const app = await buildApp({ loadAuth: () => Promise.reject(new AuthNotFoundError()) });
     const response = await app.inject({

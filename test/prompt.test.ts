@@ -139,4 +139,23 @@ describe('buildPromptAsync', () => {
       PromptValidationError,
     );
   });
+
+  it('инструктирует отвечать текстом после результата инструмента', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('после получения результата инструмента');
+    expect(result.prompt).toContain('Не оставляй ответ пустым');
+  });
+
+  it('учит использовать bash для нестандартных задач', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('используй `bash` для запуска соответствующего скрипта');
+    expect(result.prompt).toContain('сразу вызывай `bash`');
+  });
+
+  it('содержит few-shot пример системной задачи (pyautogui)', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('pyautogui');
+    expect(result.prompt).toContain('поводи мышью');
+    expect(result.prompt).toContain('<｜DSML｜tool_calls>');
+  });
 });

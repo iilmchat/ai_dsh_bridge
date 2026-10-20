@@ -173,8 +173,16 @@ export const registerCompletionsRoute = async (
       completion_tokens: assembled.tokenUsage ?? 0,
       total_tokens: assembled.tokenUsage ?? 0,
     };
-    const content = parsedDsml.text === '' ? null : parsedDsml.text;
+    let content: string | null = parsedDsml.text === '' ? null : parsedDsml.text;
     const toolCalls: OpenAiToolCall[] = parsedDsml.tool_calls;
+
+    // DSH падает на «completed response with no content», поэтому при пустом
+    // ответе без tool_calls синтезируем минимальный текст.
+    if (content === null && toolCalls.length === 0) {
+      const hadToolResult = body.messages.some((message) => message.role === 'tool');
+      content = hadToolResult ? 'Готово. Инструмент выполнен.' : 'Готово.';
+      request.log.warn('DeepSeek вернул пустой content, синтезирован fallback');
+    }
 
     if (body.stream) {
       reply.hijack();

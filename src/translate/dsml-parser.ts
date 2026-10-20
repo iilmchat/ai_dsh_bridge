@@ -316,6 +316,20 @@ const extractText = (text: string, ranges: readonly TextRange[]): string => {
 };
 
 /**
+ * Удаляет из текста остатки DSML-маркеров (открывающие/закрывающие теги
+ * tool_calls, invoke, parameter), даже если вызов невалиден.
+ *
+ * @param text Текст после вырезания DSML-блоков.
+ * @returns Текст без любых DSML-маркеров.
+ */
+const stripDsmlMarkers = (text: string): string =>
+  text
+    .replace(/<｜DSML｜[^>]*>/gu, '')
+    .replace(/<\/｜DSML｜[^>]*>/gu, '')
+    .replace(/\n{3,}/gu, '\n\n')
+    .trim();
+
+/**
  * Извлекает DSML-блоки из текста и возвращает OpenAI-совместимые tool_calls.
  *
  * @param text Полный текст ответа DeepSeek.
@@ -363,13 +377,13 @@ export const parseDsml = (text: string): ParsedDsml => {
     const fallback = parseInvokesInSegment(normalized, 0, warnings);
     if (fallback.calls.length > 0) {
       warnings.push('missing tool_calls wrapper');
-      calls.push(...fallback.calls);
-      ranges.push(...fallback.ranges);
     }
+    calls.push(...fallback.calls);
+    ranges.push(...fallback.ranges);
   }
 
   return {
-    text: extractText(normalized, ranges),
+    text: stripDsmlMarkers(extractText(normalized, ranges)),
     tool_calls: calls,
     warnings,
   };
