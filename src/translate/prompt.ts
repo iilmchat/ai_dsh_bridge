@@ -177,7 +177,12 @@ ${DSML_CALLS_OPEN}
   <｜DSML｜invoke name="bash">
     <｜DSML｜parameter name="command" string="true">python -c "import pyautogui; [pyautogui.moveTo(100, 100)]"</｜DSML｜parameter>
   </｜DSML｜invoke>
-${DSML_CALLS_CLOSE}`;
+${DSML_CALLS_CLOSE}
+
+Важно: если результат инструмента — это файл (изображение, документ, архив),
+ответь текстом с путём к сохранённому файлу (например, «Файл сохранён:
+C:\\path\\to\\file.png»). Не пытайся вставить файл в чат или описать его
+содержимое, если у тебя нет возможности его увидеть.`;
 };
 
 /**

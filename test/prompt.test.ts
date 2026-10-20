@@ -158,4 +158,10 @@ describe('buildPromptAsync', () => {
     expect(result.prompt).toContain('поводи мышью');
     expect(result.prompt).toContain('<｜DSML｜tool_calls>');
   });
+
+  it('учит возвращать путь к файлу в текстовом ответе', () => {
+    const result = buildPromptAsync({ messages: [USER_MESSAGE], tools: [BASH_TOOL] });
+    expect(result.prompt).toContain('Файл сохранён:');
+    expect(result.prompt).toContain('Не пытайся вставить файл в чат');
+  });
 });

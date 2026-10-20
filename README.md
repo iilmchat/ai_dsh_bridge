@@ -6,7 +6,7 @@
 один раз, а `tool_calls` эмулируются DSML-разметкой в prompt с корректным
 SSE-стримингом — без `UNKNOWN_TOOL`.
 
-> **Статус: v0.5.4 (scaffold).** Работают `GET /health`, `GET /v1/models`,
+> **Статус: v0.5.5 (scaffold).** Работают `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
 > `POST /v1/chat/completions` в обоих режимах — `stream: false` (JSON) и
 > `stream: true` (OpenAI SSE с `tool_calls`). DSH подключается как
