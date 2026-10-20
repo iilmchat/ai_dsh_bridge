@@ -3,7 +3,7 @@
 **Версия документа:** 1.0.0
 **Дата:** 2026-10-19
 **Синхронизирован с:** [RULES.md](RULES.md) v1.0.0, [DESIGN.md](DESIGN.md) 0.2,
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) 0.6.0-alpha, `package.json` v0.6.0-alpha.
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) 0.6.1, `package.json` v0.6.1.
 **Назначение:** готовый к использованию системный промпт для ассистента
 проекта (человеко- или AI-исполнителя).
 
@@ -43,7 +43,7 @@ CDP/Chrome и протоколом PoW DeepSeek.
 
 ## 2. Статус проекта
 
-**Версия:** v0.6.0-alpha (scaffold), дата релиза 2026-10-20.
+**Версия:** v0.6.1 (scaffold), дата релиза 2026-10-20.
 **Этап:** этапы 0, 2, 3 закрыты; этап 1 — JSON и SSE готовы; этап 4 —
 Prompt Builder; этап 5 — парсер (non-streaming, используется в SSE после
 буферизации); этап 6 — SSE-writer готов; остались этапы 7–8 (сквозной
@@ -206,7 +206,7 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 | Open KI | **2** | `docs/KNOWN_ISSUES.md` |
 | Всего KI | 16 (2 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
-| Версия | 0.6.0-alpha | `package.json` |
+| Версия | 0.6.1 | `package.json` |
 | Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
 | Покрытие тестами | 123 тестов; живой e2e DSH подтверждён вручную | — |
 
