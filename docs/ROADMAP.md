@@ -48,8 +48,9 @@ S3 (`ref_file_ids`) и S4 (LLaVA) — **Todo**, см.
 |---|---|---|---|---|
 | R-06-01 | OCR (Tesseract) | 🔴 Critical | Done | Fallback для «зрения» без vision-модели: модель через `bash` запускает `tesseract screenshot.png stdout` и получает текст. Работает локально, быстро, только текст. Реализовано в 0.6.0-alpha (S2): few-shot в Prompt Builder, полный путь к `tesseract` + подсказка `where tesseract`. |
 | R-06-02 | Локальная vision-модель (Ollama/LLaVA) | 🟠 High | Planned | Агент делает скриншот, отправляет в LLaVA через локальный HTTP, получает описание и использует его в ответе. Нужны GPU/память и модель. |
-| R-06-03 | Base64-картинки в DeepSeek Web | 🟡 Medium | Deferred | Через CDP-fallback, если DeepSeek Web API начнёт поддерживать `ref_file_ids` для изображений. Зависит от внешнего API; S3 — Todo (живой захват-проверка с документированным результатом). |
+| R-06-03 | S3 | Base64-картинки через upload_file + ref_file_ids | ✅ Done 2026-10-20 |
 | R-06-04 | Инструмент `screenshot` | 🟠 High | In Progress | Своя обёртка над `screenshot-desktop` (Node.js), сразу возвращает base64 и путь — без парсинга вывода `bash`. S1 закрыт без неё: few-shot PowerShell (`CopyFromScreen`) через `bash`; нужность отдельной обёртки — открытый вопрос (DESIGN_V06_VISION § 2.6). |
+
 
 **Критерии готовности v0.6.0:** скриншот → OCR/LLaVA → текст в prompt;
 тест на mock vision-провайдера; документация и `DESIGN_V06_VISION.md`
