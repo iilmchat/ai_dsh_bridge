@@ -12,5 +12,6 @@ Thumbs.db
 # Захваты содержат реальные токены/cookie — только локально
 docs/captures/*.http
 docs/captures/*.sse
+docs/captures/*.log
 !docs/captures/README.md
 !docs/captures/.gitkeep

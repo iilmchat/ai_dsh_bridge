@@ -21,7 +21,7 @@ const TEST_AUTH: Auth = {
 };
 
 /** id mock-сессии. */
-const SESSION_ID = '589bd06c-0000-4000-8000-000000000001';
+const SESSION_ID = '00000000-0000-4000-8000-000000000001';
 
 /** Ответ модели с DSML-вызовом. */
 const DSML_TEXT = `Я выполню команду.

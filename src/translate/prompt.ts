@@ -26,8 +26,8 @@ export type ToolChoice =
 /** Вход Prompt Builder. */
 export interface BuildPromptOptions {
   readonly messages: readonly OpenAiMessage[];
-  readonly tools?: readonly OpenAiTool[];
-  readonly toolChoice?: ToolChoice;
+  readonly tools?: readonly OpenAiTool[] | undefined;
+  readonly toolChoice?: ToolChoice | undefined;
 }
 
 /** Результат Prompt Builder. */

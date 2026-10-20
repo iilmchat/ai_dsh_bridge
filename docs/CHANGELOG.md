@@ -12,15 +12,60 @@
 
 ## [Unreleased]
 
+Изменений после 0.5.0 нет.
+
+---
+
+## [0.5.0] — 2026-10-20
+
 ### Added
+
+- `POST /v1/chat/completions` — режим `stream: true` (K2): OpenAI SSE
+  (`chat.completion.chunk`), role/content-чанки, `tool_calls` с `id`/`name`
+  только в первом чанке, `finish_reason`, `[DONE]`,
+  `stream_options.include_usage`.
+- `src/translate/sse-writer.ts` — `writeOpenAiSse`.
+- Схема запроса расширена: `top_p`, `stream_options`, `frequency_penalty`,
+  `presence_penalty`, `stop` (DSH может их присылать).
+- `test/api-completions-stream.test.ts` — 6 тестов SSE (контракт чанков,
+  continuation без `id`/`name`, usage, ошибки; всего **105 тестов**).
+
+### Changed
+
+- KI-002, KI-005, KI-006 → Fixed (v0.5.0); KI-007 переформулирован:
+  остались e2e-тест шлюза и отказ от `passWithNoTests`.
+
+---
+
+## [0.4.0] — 2026-10-20
+
+### Added
+
+- `POST /v1/chat/completions` — non-streaming режим (K1): Zod-валидация,
+  Prompt Builder, DeepSeek (session + PoW + SSE-сборка), DSML-парсер,
+  OpenAI-ответ с `tool_calls`; `stream: true` → 501 (K2).
+- `src/api/completions.ts`, `src/api/completions.schema.ts` — обработчик и
+  строгая схема запроса.
+- `src/translate/assemble.ts` — `assembleTextFromEvents`: текст из
+  SET/APPEND/text-событий и `accumulated_token_usage` из BATCH.
+- `test/api-completions.test.ts` — 10 тестов (200 content/tool_calls,
+  400/401/501/502, сборка текста; всего **99 тестов**).
 
 - `scripts/e2e-tools.ts` и `pnpm e2e:tools` — диагностический прогон DSML:
   Prompt Builder (`messages + tools`) → DeepSeek → сборка текста →
   `parseDsml`; флаги `--prompt-only` (без сети) и `--verbose`; лог
   `docs/captures/e2e-tools-YYYY-MM-DD-HH-mm-ss.log`.
 - `test/e2e-tools-script.test.ts` — 5 тестов (prompt-only, mock-поток с
-  DSML, ответ без DSML, невалидный DSML, имя лога; всего **89 тестов**).
+  DSML, ответ без DSML, невалидный DSML, имя лога).
 - GETTING_STARTED §4.6 — проверка DSML с tools.
+
+### Changed
+
+- Подготовка к публикации на GitHub: README переписан для внешнего
+  пользователя (требования, webauth, запуск, DSH, e2e, безопасность);
+  личные абсолютные пути разработчика заменены на относительные/домашние;
+  фрагмент реального `chat_session_id` обезличен; в `.gitignore` явно
+  добавлены `docs/captures/*.log`; `package.json.name` → `ai_dsh_bridge`.
 
 ---
 
@@ -76,7 +121,7 @@
   секретам. Диагностика печатается как `[5.1] Non-SSE response` (нумерация
   этапов e2e сдвинута: `[2] createChatSession`, `[8] E2E OK`).
 - KI-016 — `chat_session/create` подтверждён живым e2e (2026-10-19,
-  `id=589bd06c-…`): структура `data.biz_data.chat_session.id` верна,
+  `id=<uuid>`): структура `data.biz_data.chat_session.id` верна,
   схема клиента не менялась.
 - Тесты: 66 всего (создание сессии, её отсутствие, `safeBodyPreview` +
   `biz_data`, `accept`, `target_path` PoW, Prompt Builder).

@@ -1,6 +1,6 @@
 {
-  "name": "ai-dsh-bridge",
-  "version": "0.3.1",
+  "name": "ai_dsh_bridge",
+  "version": "0.5.0",
   "description": "OpenAI-compatible gateway for DeepSeek Harness via chat.deepseek.com",
   "type": "module",
   "license": "MIT",

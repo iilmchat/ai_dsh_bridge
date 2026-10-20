@@ -1,17 +1,18 @@
 /**
  * AI DSH Bridge — точка входа L1 (OpenAI Facade).
  *
- * На этапе v0.3.1 реализован каркас L1:
+ * На этапе v0.5.0 работают:
  * - `GET /health` — проверка живости;
  * - `GET /v1/models` — список моделей для Custom Provider DSH;
- * - `POST /v1/chat/completions` — заглушка 501: слой трансляции (DESIGN § 5)
- *   появится на этапах 5–6.
+ * - `POST /v1/chat/completions` — чат в режимах `stream: false` и
+ *   `stream: true` (OpenAI SSE, включая `tool_calls`).
  */
 import Fastify, { type FastifyInstance } from 'fastify';
+import { registerCompletionsRoute } from './api/completions.js';
 import { loadConfig, type BridgeConfig } from './config.js';
 
 /** Версия каркаса; синхронизируется с `package.json` вручную. */
-const APP_VERSION = '0.3.1';
+const APP_VERSION = '0.5.0';
 
 /** Идентификаторы моделей, доступных DSH через шлюз. */
 const MODEL_IDS = ['deepseek-web-chat', 'deepseek-web-reasoner'] as const;
@@ -37,21 +38,14 @@ interface HealthResponse {
   readonly uptime_sec: number;
 }
 
-/** Ошибка в формате OpenAI. */
-interface OpenAIErrorResponse {
-  readonly error: {
-    readonly message: string;
-    readonly type: string;
-    readonly param: string | null;
-    readonly code: string;
-  };
-}
-
 /**
  * Собирает экземпляр Fastify с маршрутами L1.
  * @returns Приложение и валидированная конфигурация.
  */
-export const buildServer = (): { app: FastifyInstance; config: BridgeConfig } => {
+export const buildServer = async (): Promise<{
+  app: FastifyInstance;
+  config: BridgeConfig;
+}> => {
   const config = loadConfig();
   const app = Fastify({ logger: { level: config.logLevel } });
 
@@ -71,24 +65,14 @@ export const buildServer = (): { app: FastifyInstance; config: BridgeConfig } =>
     })),
   }));
 
-  app.post('/v1/chat/completions', (_request, reply): OpenAIErrorResponse => {
-    reply.code(501);
-    return {
-      error: {
-        message: 'Not implemented: translation layer (DESIGN § 5) is planned for stages 3–6.',
-        type: 'not_implemented',
-        param: null,
-        code: 'not_implemented',
-      },
-    };
-  });
+  await registerCompletionsRoute(app);
 
   return { app, config };
 };
 
 /** Запускает HTTP-сервер и регистрирует graceful shutdown. */
 const main = async (): Promise<void> => {
-  const { app, config } = buildServer();
+  const { app, config } = await buildServer();
 
   const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     app.log.info({ signal }, 'shutting down');

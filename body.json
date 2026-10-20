@@ -1,0 +1,30 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Выполни ls -la"
+    }
+  ],
+  "stream": true,
+  "model": "deepseek-web-chat",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "description": "Выполняет shell-команду",
+        "name": "bash",
+        "parameters": {
+          "required": [
+            "command"
+          ],
+          "properties": {
+            "command": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      }
+    }
+  ]
+}

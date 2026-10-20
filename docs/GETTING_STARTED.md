@@ -1,21 +1,19 @@
 # AI DSH Bridge — руководство по началу работы
 
-**Версия:** 0.3.1 (scaffold)
+**Версия:** 0.5.0 (scaffold)
 **Дата:** 2026-10-19
 **Связанные документы:** [DESIGN.md](./DESIGN.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [RULES.md](./RULES.md), [KNOWN_ISSUES.md](./KNOWN_ISSUES.md)
 
-> **Что уже работает в v0.3.1.** Запускается Fastify-каркас L1:
-> `GET /health`, `GET /v1/models`. `POST /v1/chat/completions` пока
-> возвращает `501 Not implemented`. `pnpm webauth`, клиент DeepSeek с PoW и
-> Prompt Builder реализованы (Этапы 2–4); DSML-парсер и SSE `tool_calls`
-> реализуются на этапах 5–6 (DESIGN §10). Шаги, которые станут доступны
-> позже, помечены в тексте явно.
+> **Что уже работает в v0.5.0.** `GET /health`, `GET /v1/models`,
+> `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
+> `POST /v1/chat/completions` в обоих режимах: `stream: false` (JSON) и
+> `stream: true` (OpenAI SSE с `tool_calls`).
 
 ---
 
 ## 0. Матрица готовности шагов
 
-| Шаг руководства | Что проверяет | Статус в v0.3.1 |
+| Шаг руководства | Что проверяет | Статус в v0.5.0 |
 |---|---|---|
 | §1–2. Требования и установка | Node.js 22+, pnpm, зависимости | ✅ доступно |
 | §4. Запуск каркаса | `pnpm dev`, `/health`, `/v1/models` | ✅ доступно |
@@ -49,8 +47,8 @@
 ## 2. Установка
 
 ```powershell
-git clone <url-репозитория> C:\Projects\AI\ai_dsh_bridge
-cd C:\Projects\AI\ai_dsh_bridge
+git clone <url-репозитория> "$HOME\ai_dsh_bridge"
+cd "$HOME\ai_dsh_bridge"
 pnpm install
 ```
 
@@ -135,7 +133,7 @@ pnpm dev
 
 ```text
 {"level":30,"time":1760886000000,"pid":12345,"hostname":"dev","msg":"Server listening at http://127.0.0.1:3456"}
-{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.3.1 listening on http://127.0.0.1:3456"}
+{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.5.0 listening on http://127.0.0.1:3456"}
 ```
 
 Сервер слушает **только loopback** (`127.0.0.1`). Порт берётся из `PORT`
@@ -162,7 +160,7 @@ curl -s http://127.0.0.1:3456/health
 ```json
 {
   "status": "ok",
-  "version": "0.3.1",
+  "version": "0.5.0",
   "uptime_sec": 12
 }
 ```
@@ -190,10 +188,11 @@ curl -s http://127.0.0.1:3456/v1/models
 }
 ```
 
-### 4.4. Проверка заглушки `POST /v1/chat/completions`
+### 4.4. Проверка `POST /v1/chat/completions` (JSON и SSE)
 
-В v0.3.1 эндпоинт по-прежнему отвечает `501` — это ожидаемое поведение, а не
-ошибка установки:
+В v0.5.0 работают оба режима — при наличии `auth.json` (иначе `401`).
+
+Non-streaming (`stream: false`):
 
 ```powershell
 $body = '{"model":"deepseek-web-chat","messages":[{"role":"user","content":"ping"}],"stream":false}'
@@ -202,18 +201,38 @@ curl.exe -s -i -X POST http://127.0.0.1:3456/v1/chat/completions `
   -d $body
 ```
 
-Ожидаемый статус — `HTTP/1.1 501 Not Implemented`, тело:
+Ожидаемый статус — `HTTP/1.1 200 OK`, тело в формате OpenAI:
 
 ```json
 {
-  "error": {
-    "message": "Not implemented: translation layer (DESIGN § 5) is planned for stages 3–6.",
-    "type": "not_implemented",
-    "param": null,
-    "code": "not_implemented"
-  }
+  "id": "chatcmpl-…",
+  "object": "chat.completion",
+  "choices": [{
+    "index": 0,
+    "message": { "role": "assistant", "content": "…" },
+    "finish_reason": "stop"
+  }],
+  "usage": { "prompt_tokens": 0, "completion_tokens": 42, "total_tokens": 42 }
 }
 ```
+
+При `tools` и DSML-ответе модели будет `finish_reason: "tool_calls"` и
+`message.tool_calls[]`.
+
+Streaming (`stream: true`):
+
+```powershell
+$body = '{"model":"deepseek-web-chat","messages":[{"role":"user","content":"ping"}],"stream":true}'
+curl.exe -sN -X POST http://127.0.0.1:3456/v1/chat/completions `
+  -H "Content-Type: application/json" `
+  -d $body
+```
+
+Ответ — `text/event-stream`: чанки `data: {"object":"chat.completion.chunk",...}`
+с `delta.role`/`delta.content`, для инструментов — `delta.tool_calls`
+(`id`/`name` только в первом чанке, далее только фрагменты `arguments`),
+финальный `finish_reason` и `data: [DONE]`. DSH по умолчанию использует
+именно этот режим.
 
 ### 4.5. Проверка подключения к DeepSeek (e2e)
 
@@ -260,9 +279,10 @@ pnpm e2e:tools -- --verbose
 ## 5. Настройка DSH (Custom Provider)
 
 > ⚠️ **Статус.** Провайдер и список моделей можно добавить уже сейчас
-> (`GET /v1/models` работает). Реальные ответы появятся после этапов 2–3
-> (аутентификация + клиент DeepSeek), а tool-call цикл — после этапов 4–7.
-> До этого DSH при попытке чата получит `501 Not implemented`.
+> (`GET /v1/models` работает). Шлюз поддерживает и `stream:false`, и
+> `stream:true` (SSE с `tool_calls`, K2/0.5.0), поэтому DSH может
+> использовать его как Custom Provider; сквозной tool-call цикл проверяется
+> (KI-007).
 
 > Если шлюз запущен не на `3456` (см. §4.1), замените порт в `openaiURL`,
 > например `http://localhost:3457/v1/chat/completions`.
@@ -345,7 +365,7 @@ llm-pi-ai:
 
 ### 6.3. Что смотреть в логах
 
-- старт сервера: `AI DSH Bridge v0.3.1 listening on ...`;
+- старт сервера: `AI DSH Bridge v0.5.0 listening on ...`;
 - `requestId` запроса и модель;
 - статус upstream-ответа и длительность PoW (ориентир 100–500 мс);
 - число распознанных `tool_calls` и `finish_reason`;
@@ -374,7 +394,7 @@ pnpm dev
 | `EADDRINUSE` на порту 3456 | Порт занят другим процессом | Остановите процесс или задайте другой `PORT` (например, `PORT=3457` в `.env`) |
 | `curl`/`Invoke-RestMethod` — `connection refused` | Сервер не запущен или клиент идёт на `::1` | Запустите `pnpm dev`; используйте `http://127.0.0.1:3456` |
 | DSH «не отвечает» / таймаут запроса | Шлюз не запущен, сессия не получена, занят порт 3456 | Проверьте `pnpm dev`, `GET /health`, порт 3456 и сессию Chrome (§3, §4) |
-| `501 Not implemented` на `/v1/chat/completions` | Ожидаемое поведение v0.3.1 (L2/L3 не подключены) | Дождитесь подключения фасада: KI-002, KI-005 |
+| `501 Not implemented` на `/v1/chat/completions` | Установлена версия <0.5.0 | Обновите проект: в 0.5.0 `stream:true` реализован |
 | `pnpm webauth` — «файл не найден» | Установлен старый релиз (<0.2.0) | Обновите проект: в v0.2.0 `src/auth/webauth.ts` присутствует |
 | `401` с текстом «Re-run webauth» | Сессия DeepSeek истекла/невалидна | Повторите `pnpm webauth`; проверьте `AUTH_FILE` |
 | `UNKNOWN_TOOL` в DSH | В continuation-чанках переданы `id`/`name` (пустая строка или `null`) | Проверьте SSE-поток при `DEBUG=1`; исправьте SseWriter: `id`/`name` только в первом чанке (RULES §7.1, ARCHITECTURE §5.5) |
@@ -455,7 +475,7 @@ pnpm dev
 
 Все команды — из `package.json`; других CLI-флагов проект не вводит.
 
-| Команда | Что делает | Статус в v0.3.1 |
+| Команда | Что делает | Статус в v0.5.0 |
 |---|---|---|
 | `pnpm dev` | Запуск с `tsx watch --env-file-if-exists=.env` | ✅ |
 | `pnpm build` | Сборка TypeScript (`tsc -p tsconfig.build.json`) | ✅ |

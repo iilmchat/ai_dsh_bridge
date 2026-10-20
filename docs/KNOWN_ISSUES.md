@@ -1,8 +1,8 @@
 # Известные проблемы AI DSH Bridge
 
-**Версия реестра:** 0.3.1
+**Версия реестра:** 0.5.0
 **Дата последнего обновления:** 2026-10-20
-**Статус проекта:** v0.3.1 (scaffold)
+**Статус проекта:** v0.5.0 (scaffold)
 
 Формат: `KI-XXX` — название, приоритет, статус, файлы.
 Приоритеты: 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low
@@ -19,9 +19,9 @@
 
 | Статус | Количество | Записи |
 |---|---|---|
-| Open | 6 | KI-002, KI-005, KI-006, KI-007, KI-014, KI-015 |
+| Open | 3 | KI-007, KI-014, KI-015 |
 | In Progress | 0 | — |
-| Fixed | 7 | KI-003, KI-004, KI-008, KI-009, KI-011, KI-012, KI-016 |
+| Fixed | 10 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-008, KI-009, KI-011, KI-012, KI-016 |
 | Documented | 1 | KI-001 |
 | Deferred | 1 | KI-010 |
 | Won't Fix | 1 | KI-013 |
@@ -42,12 +42,12 @@
 | Этап | Содержание | Связанные KI |
 |---|---|---|
 | 0 | Исследование (захват запроса/ответа DeepSeek) | — |
-| 1 | Каркас: Fastify + `/v1/models` + заглушка | KI-002 (KI-008 исправлен в 0.1.1, KI-012 — в 0.1.2) |
+| 1 | Каркас: Fastify + `/v1/models` + `/v1/chat/completions` | KI-002 — Fixed в 0.5.0 (SSE) |
 | 2 | Аутентификация (`webauth`, `auth.json`) | KI-003 — Fixed в 0.2.0 |
 | 3 | DeepSeek Client (HTTP + PoW) | KI-004 — Fixed в 0.2.0 |
-| 4 | Prompt Builder (DSML injection) | KI-005 (Prompt Builder готов в 0.3.0, non-streaming парсер — в 0.3.1) |
-| 5 | DSML Parser (non-streaming) | KI-005, KI-007 (non-streaming парсер готов в 0.3.1; streaming — нет) |
-| 6 | SSE Streaming (`id`/`name` только в первом чанке) | KI-006, KI-007 |
+| 4 | Prompt Builder (DSML injection) | KI-005 — Fixed в 0.5.0 |
+| 5 | DSML Parser | KI-005 — Fixed в 0.5.0 |
+| 6 | SSE Streaming (`id`/`name` только в первом чанке) | KI-006 — Fixed в 0.5.0; e2e — KI-007 |
 | 7 | Полный цикл tool_call | KI-002, KI-005, KI-006 |
 | 8 | Устойчивость (edge cases, retry, логирование) | KI-004, KI-006 |
 
@@ -61,20 +61,18 @@
 - **Описание:** Шаблон. Реальные проблемы начинаются с KI-002.
 - **Связанные:** —
 
-### KI-002 — `POST /v1/chat/completions` отвечает заглушкой 501 (Open)
-- **Приоритет:** 🟠 High | **Статус:** Open | **Обнаружено:** 2026-10-19
-- **Файлы:** `src/index.ts` (маршрут-заглушка), `docs/DESIGN.md` § 7
-- **Описание:** Единственный «рабочий» чат-эндпоинт возвращает HTTP 501 с
-  телом ошибки OpenAI (`type: "not_implemented"`, `code: "not_implemented"`)
-  и не разбирает запрос. Тело `messages`, `tools`, `stream`, `tool_choice`
-  игнорируется, вызова DeepSeek не происходит, SSE не отдаётся. DSH может
-  добавить провайдера и получить список моделей, но любой чат завершится
-  ошибкой.
-- **Влияние:** сквозной сценарий «DSH → шлюз → DeepSeek» невозможен;
-  проверить контракт `tool_calls` вживую нельзя.
-- **План:** заменить заглушку на полный конвейер: L2 (Prompt Builder, parser,
-  reconstructor) и L3 (клиент DeepSeek) — Этапы 3–6 по DESIGN § 10.
-- **Связанные:** KI-003, KI-004, KI-005, KI-006
+### KI-002 — `POST /v1/chat/completions`: нет SSE-режима (`stream: true`) (Fixed)
+- **Приоритет:** 🟠 High | **Статус:** Fixed | **Обнаружено:** 2026-10-19
+- **Исправлено в:** v0.5.0 (2026-10-20)
+- **Файлы:** `src/api/completions.ts`, `src/translate/sse-writer.ts`
+- **Описание:** В 0.4.0 был реализован только non-streaming режим, а
+  `stream: true` возвращал HTTP 501, из-за чего DSH (стримит по умолчанию)
+  не мог использовать шлюз для сквозного чата.
+- **Исправление:** K2 — `writeOpenAiSse` и SSE-ветка в роуте: чанки
+  `chat.completion.chunk`, `id`/`name` только в первом `tool_calls`-чанке,
+  continuation-чанки без них, `finish_reason`, `[DONE]`,
+  `stream_options.include_usage`; тесты `test/api-completions-stream.test.ts`.
+- **Связанные:** KI-005, KI-006, KI-007
 
 ### KI-003 — `webauth` не реализован (Fixed)
 - **Приоритет:** 🟠 High | **Статус:** Fixed | **Обнаружено:** 2026-10-19
@@ -109,57 +107,45 @@
   на SSE/ретраи/401/валидацию; `pnpm test` — 34 теста зелёные.
 - **Связанные:** KI-002, KI-003, DESIGN § 4, § 5.3, § 6.3
 
-### KI-005 — Нет PromptBuilder, DsmlParser и ToolReconstructor (Open)
-- **Приоритет:** 🔴 Critical | **Статус:** Open | **Обнаружено:** 2026-10-19
+### KI-005 — Нет PromptBuilder, DsmlParser и ToolReconstructor (Fixed)
+- **Приоритет:** 🔴 Critical | **Статус:** Fixed | **Обнаружено:** 2026-10-19
+- **Исправлено в:** v0.5.0 (2026-10-20)
 - **Файлы:** `src/translate/prompt.ts`, `src/translate/dsml-parser.ts`,
-  `src/translate/tool-reconstructor.ts` (все отсутствуют, планируются)
-- **Описание:** Ядро проекта — слой трансляции DSML — отсутствует. `tools[]`
-  из запроса DSH не внедряются в системную инструкцию, потоковый парсер
-  `IDLE → SEEN_CALLS_OPEN → IN_INVOKE → IN_PARAMETER → VALUE → CLOSING → DONE`
-  не написан, нормализация двойных pipe-маркеров и fail-safe для незакрытых
-  параметров не реализованы, `tool_calls` из ответа модели не собираются.
-- **Влияние:** DSH не сможет выполнять инструменты; любой tool_call либо не
-  будет распознан, либо приведёт к `UNKNOWN_TOOL`. Без этого слоя шлюз не
-  решает заявленную задачу (DESIGN § 1.1).
-- **План:** Этапы 4–5 (DESIGN § 5, § 6): Prompt Builder, парсер
-  non-streaming, ToolReconstructor, нормализация edge cases; тесты парсера —
-  `test/dsml-parser.test.ts`.
-- **Связанные:** KI-006, KI-007, DESIGN § 5
+  `src/translate/sse-writer.ts`
+- **Описание:** Слой трансляции DSML отсутствовал: `tools[]` не внедрялись
+  в prompt, `tool_calls` не извлекались, SSE-контракт не соблюдался.
+- **Исправление:** Prompt Builder (0.3.0), non-streaming `parseDsml` с
+  нормализацией pipe-маркеров и fail-safe (0.3.1), `writeOpenAiSse` (0.5.0).
+  SSE-режим буферизует текст и использует тот же парсер — отдельный
+  инкрементальный tokenizer/ToolReconstructor не потребовался для контракта.
+- **Связанные:** KI-002, KI-006, DESIGN § 5
 
-### KI-006 — Нет SSE-писателя; контракт `id`/`name` не реализован (Open)
-- **Приоритет:** 🟠 High | **Статус:** Open | **Обнаружено:** 2026-10-19
-- **Файлы:** `src/translate/sse.ts` (отсутствует, планируется),
-  `docs/api-contract.json`, `docs/DESIGN.md` § 5.3
-- **Описание:** Потоковый режим (`stream: true`) не реализован: чанки
-  `chat.completion.chunk` не формируются, поля `delta.content`,
-  `delta.role`, `delta.tool_calls` не отдаются. Ключевое правило — `id` и
-  `name` инструмента передаются ровно один раз, в первом чанке для данного
-  `index`, а в continuation-чанках отсутствуют — пока зафиксировано только
-  в документации и контракте; кода и тестов, которые это гарантируют, нет.
-- **Влияние:** риск `UNKNOWN_TOOL` при первом же включении streaming после
-  реализации; сейчас DSH получает 501 и не доходит до SSE.
-- **План:** Этап 6 (DESIGN § 5.3): SseWriter, потоковый парсер, тест
-  `test/sse-tool-calls.test.ts` с проверкой отсутствия `id`/`name` в
-  continuation-чанках (включая отсутствие `""` и `null`).
-- **Связанные:** KI-005, KI-007, `docs/api-contract.json`
+### KI-006 — Нет SSE-писателя; контракт `id`/`name` не реализован (Fixed)
+- **Приоритет:** 🟠 High | **Статус:** Fixed | **Обнаружено:** 2026-10-19
+- **Исправлено в:** v0.5.0 (2026-10-20)
+- **Файлы:** `src/translate/sse-writer.ts`, `docs/api-contract.json`,
+  `docs/DESIGN.md` § 5.3
+- **Описание:** Потоковый режим (`stream: true`) не был реализован: чанки
+  `chat.completion.chunk` не формировались, контракт `id`/`name` существовал
+  только в документации.
+- **Исправление:** `writeOpenAiSse`: роль, content-чанки, первый
+  `tool_calls`-чанк с `id`/`name`, continuation-чанки без них (поля
+  отсутствуют, не пустые), `finish_reason`, `[DONE]`, опциональный
+  usage-чанк; тесты в `test/api-completions-stream.test.ts`.
+- **Связанные:** KI-002, KI-005, KI-007, `docs/api-contract.json`
 
-### KI-007 — Нет автотестов; `pnpm test` зелёный при нуле тестов (Open)
+### KI-007 — Нет e2e-теста шлюза (DSH ↔ шлюз) (Open)
 - **Приоритет:** 🟠 High | **Статус:** Open | **Обнаружено:** 2026-10-19
-- **Файлы:** `test/` (только `.gitkeep`), `vitest.config.ts` (`passWithNoTests: true`),
-  `package.json` (`"test": "vitest run --passWithNoTests"`)
-- **Описание:** В репозитории нет ни одного файла `*.test.ts`. Скрипт
-  `pnpm test` намеренно сконфигурирован так, чтобы завершаться успешно без
-  тестов, поэтому зелёный прогон не подтверждает работоспособность кода.
-  Отсутствуют запланированные тесты: `dsml-parser.test.ts`,
-  `sse-tool-calls.test.ts`, `e2e.test.ts` (мок DeepSeek), а также тесты
-  конфигурации `config.ts`.
-- **Влияние:** регрессии в парсере/SSE-контракте будут незаметны; релизный
-  чек-лист не может опираться на `pnpm test` как на критерий качества.
-- **План:** Этапы 5–7: вместе с кодом добавить тесты и убрать
-  `--passWithNoTests` из основного скрипта (оставив его только в
-  `test:watch`/локальных прогонах). В релизном чек-листе — дополнительная
-  проверка наличия файлов тестов (см. RELEASES § 2).
-- **Связанные:** KI-005, KI-006
+- **Файлы:** `test/`, `vitest.config.ts`, `package.json`
+- **Описание:** Unit-тесты есть (105, включая парсер, SSE и роут), но нет
+  сквозного e2e-теста «DSH → шлюз → DeepSeek → tool_call → результат»;
+  `pnpm test` всё ещё содержит `--passWithNoTests`, поэтому нулевой прогон
+  формально зелёный.
+- **Влияние:** контракт с реальным DSH не проверен автоматически; регрессии
+  во взаимодействии с DSH может поймать только ручной smoke.
+- **План:** Этап 7 — e2e-тест с моком DeepSeek (или записывающим прокси) +
+  ручной smoke с DSH; убрать `--passWithNoTests` из основного скрипта.
+- **Связанные:** KI-002, KI-005, KI-006
 
 ### KI-008 — Нет конфигурации oxlint (`.oxlintrc.json`) (Fixed)
 - **Приоритет:** 🟡 Medium | **Статус:** Fixed | **Обнаружено:** 2026-10-19
@@ -321,7 +307,7 @@
   захвата не было. Клиент поддерживал три возможных места id и бросал
   `DeepSeekApiError`, если id нет.
 - **Проверено:** живой e2e 2026-10-19 прошёл полностью (`[8] E2E OK`,
-  текст «Привет! Чем могу помочь?»); сессия создана, `id=589bd06c-…`
+  текст «Привет! Чем могу помочь?»); сессия создана, `id=<uuid>`
   пришёл именно в `data.biz_data.chat_session.id` — схема верна.
 - **Связанные:** KI-003, DESIGN § 6.3, CHANGELOG 0.3.0
 
@@ -330,7 +316,7 @@
 ## v0.3.0 — Prompt Builder (2026-10-19)
 
 KI-016 закрыт: структура `POST /api/v0/chat_session/create` подтверждена
-живым e2e 2026-10-19 (сессия `id=589bd06c-…`, поток `users/current` →
+живым e2e 2026-10-19 (сессия `id=<uuid>`, поток `users/current` →
 `chat_session/create` → `create_pow_challenge` → PoW → `/chat/completion`
 → `[8] E2E OK`). Добавлен слой L2: `src/translate/prompt.ts` (Prompt
 Builder) и `src/translate/types.ts`; оставшиеся KI-005/KI-006 относятся к
@@ -436,3 +422,5 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.2.0 | 2026-10-19 | KI-003 (webauth) и KI-004 (клиент+PoW) → Fixed; KI-013 → Won't Fix (WAF не обязателен); добавлены KI-014 (PoW ~570 мс), KI-015 (CDP reuse) и KI-016 (нет захвата chat_session/create); 34→53 теста |
 | 0.3.0 | 2026-10-19 | KI-016 → Fixed (живой e2e подтвердил структуру `chat_session/create`); добавлен Prompt Builder (`src/translate/`), тестов 66 |
 | 0.3.1 | 2026-10-20 | Добавлен non-streaming DSML-парсер (`src/translate/dsml-parser.ts`), тестов 84; новых KI нет |
+| 0.4.0 | 2026-10-20 | `POST /v1/chat/completions` (non-streaming): Zod, сборка текста, DSML → `tool_calls`; KI-002 остаётся Open из-за `stream:true`; тестов 99 |
+| 0.5.0 | 2026-10-20 | K2: `stream:true` + `writeOpenAiSse`; KI-002/KI-005/KI-006 → Fixed; тестов 105; KI-007 переформулирован (нужен e2e шлюза) |

@@ -603,14 +603,15 @@ upstream при разрыве соединения с DSH; логировани
 
 | Метод | Путь | Назначение | Ответ | Доступность |
 |---|---|---|---|---|
-| GET | `/health` | Проверка живости процесса | `{"status":"ok","version":"0.1.0","uptime_sec":N}` | каркас v0.1.0 |
-| GET | `/v1/models` | Список моделей для DSH | `ModelsResponse` | каркас v0.1.0 |
-| POST | `/v1/chat/completions` | Основной эндпоинт (streaming / non-streaming) | SSE `chat.completion.chunk` или `chat.completion` | заглушка `501 Not implemented` в v0.1.0; реализация — этапы 3–7 |
+| GET | `/health` | Проверка живости процесса | `{"status":"ok","version":"0.5.0","uptime_sec":N}` | ✅ v0.5.0 |
+| GET | `/v1/models` | Список моделей для DSH | `ModelsResponse` | ✅ v0.5.0 |
+| POST | `/v1/chat/completions` | Основной эндпоинт (streaming / non-streaming) | SSE `chat.completion.chunk` или `chat.completion` | ✅ v0.5.0 (JSON — 0.4.0, SSE — 0.5.0) |
 
-`POST /v1/chat/completions` в каркасе возвращает ошибку в
-OpenAI-совместимом конверте (`type: "not_implemented"`, `code:
-"not_implemented"`); после этапов 3–7 — поток `chat.completion.chunk` либо
-объект `chat.completion`. `/health` — служебный эндпоинт шлюза; в
+`POST /v1/chat/completions` реализован: при `stream:false` — объект
+`chat.completion` с `message.tool_calls`, при `stream:true` — поток
+`chat.completion.chunk` (правило `id`/`name` только в первом
+`tool_calls`-чанке, DESIGN § 5.3) и `[DONE]`; ошибки — в
+OpenAI-совместимом конверте. `/health` — служебный эндпоинт шлюза; в
 `api-contract.json` он не входит (контракт описывает только
 OpenAI-совместимую поверхность).
 
