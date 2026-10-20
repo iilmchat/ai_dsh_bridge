@@ -12,7 +12,13 @@
 
 ## [Unreleased]
 
-Изменений после 0.5.5 нет.
+### Added
+
+- `docs/ROADMAP.md` — карта развития v0.6.0–v0.9.0 (Vision, Performance,
+  Ecosystem, Advanced) с ID `R-XX-NN` и приоритетами.
+- `docs/DESIGN_V06_VISION.md` — черновик архитектуры Vision & Multimodal
+  (OCR/LLaVA/CDP, гибридный выбор).
+- Backlog `KI-1001…KI-1015` в KNOWN_ISSUES (не входит в сводку активных KI).
 
 ---
 

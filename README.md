@@ -101,10 +101,23 @@ pnpm e2e:tools -- --verbose      # живой прогон
 pnpm e2e:tools -- --prompt-only  # только prompt, без сети
 ```
 
+## Что дальше
+
+Планы развития — в [docs/ROADMAP.md](docs/ROADMAP.md):
+v0.6.0 — Vision & Multimodal (OCR/LLaVA, скриншоты; черновик архитектуры —
+[docs/DESIGN_V06_VISION.md](docs/DESIGN_V06_VISION.md)), v0.7.0 —
+Performance & Reliability (ускорение PoW, инкрементальный streaming,
+сессии), v0.8.0 — Ecosystem (npm/Docker/reasoner/метрики), v0.9.0 —
+Advanced (CDP-fallback и др.). Идеи продублированы в
+[docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) как backlog.
+
 ## Документация
 
 - [DESIGN.md](docs/DESIGN.md) — назначение, архитектура, DSML/`tool_calls`,
   PoW, этапы реализации и риски. **Начните отсюда.**
+- [ROADMAP.md](docs/ROADMAP.md) — карта развития v0.6.0–v0.9.0.
+- [DESIGN_V06_VISION.md](docs/DESIGN_V06_VISION.md) — черновик Vision &
+  Multimodal (OCR/LLaVA/CDP).
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — C4-модель, компоненты, SSE-контракт.
 - [GETTING_STARTED.md](docs/GETTING_STARTED.md) — установка, webauth, DSH, e2e,
   troubleshooting, переменные окружения.

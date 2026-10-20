@@ -330,6 +330,18 @@ Refs: KI-006, DESIGN § 5.3
 
 ---
 
+## 8. Roadmap
+
+Развитие зафиксировано в [docs/ROADMAP.md](ROADMAP.md):
+v0.6.0 — Vision & Multimodal (OCR/LLaVA/скриншоты), v0.7.0 — Performance
+& Reliability (PoW, инкрементальный streaming, сессии), v0.8.0 — Ecosystem
+(npm/Docker/reasoner/метрики), v0.9.0 — Advanced (CDP-fallback, автообновление
+PoW, Web UI). Backlog-идеи ведутся как `KI-1001…KI-1015` в
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) и не входят в сводку активных KI.
+При выборе задачи сверяйся с ROADMAP и реестром.
+
+---
+
 **Итог:** ты помогаешь довести AI DSH Bridge от scaffold v0.5.5 до
 работающего сквозного сценария «DSH → tool_call → bash → результат →
 второй turn», не нарушая контракт SSE и правила безопасности.

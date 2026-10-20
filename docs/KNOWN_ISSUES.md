@@ -429,3 +429,30 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.5.3 | 2026-10-20 | Few-shot пример вызова `bash` (pyautogui) для системных задач; 112 тестов |
 | 0.5.4 | 2026-10-20 | Очистка `text` от остатков DSML (закрывающие маркеры, незакрытые invoke); 114 тестов |
 | 0.5.5 | 2026-10-20 | Инструкция для файловых результатов (отвечать путём к файлу); 115 тестов |
+
+---
+
+## Backlog (Planned/Deferred)
+
+Идеи развития из [ROADMAP.md](ROADMAP.md). Это **не активные дефекты**:
+они не входят в сводку выше и не блокируют релизы. При старте работы над
+пунктом создаётся обычный KI с техническими деталями, а запись здесь
+переводится в `In Progress`/`Done`.
+
+| ID | Roadmap | Приоритет | Статус | Кратко |
+|---|---|---|---|---|
+| KI-1001 | R-06-01 | 🔴 Critical | Planned | OCR (Tesseract) через `bash` — текст со скриншота без vision-модели |
+| KI-1002 | R-06-02 | 🟠 High | Planned | Локальная vision-модель (Ollama/LLaVA) — описание сцены |
+| KI-1003 | R-06-03 | 🟡 Medium | Deferred | Base64-картинки в DeepSeek Web через CDP — зависит от внешнего API |
+| KI-1004 | R-06-04 | 🟠 High | Planned | Инструмент `screenshot` (обёртка `screenshot-desktop`, base64 + путь) |
+| KI-1005 | R-07-01 | 🟠 High | Planned | PoW через `worker_threads` — цель ~150 мс вместо ~500 мс |
+| KI-1006 | R-07-02 | 🟠 High | Planned | Инкрементальный streaming DSML — первый SSE-чанк без полной буферизации |
+| KI-1007 | R-07-03 | 🟠 High | Planned | Ротация/пересоздание `chat_session_id` при 401 без ручного `webauth` |
+| KI-1008 | R-07-04 | 🟡 Medium | Planned | Мультиаккаунтность: несколько `auth.json`, балансировка |
+| KI-1009 | R-08-01 | 🟡 Medium | Planned | Публикация в npm (`npx ai-dsh-bridge`) |
+| KI-1010 | R-08-02 | 🟡 Medium | Planned | Docker-образ (`docker run -p 3456:3456`) |
+| KI-1011 | R-08-03 | 🟡 Medium | Planned | Поддержка `deepseek-web-reasoner` без обрезки по токенам |
+| KI-1012 | R-08-04 | 🟡 Medium | Planned | Метрики и OTel: токены, время, PoW, tool_calls |
+| KI-1013 | R-09-01 | 🟢 Low | Deferred | CDP-fallback, если прямые HTTP перестанут работать из-за WAF |
+| KI-1014 | R-09-02 | 🟢 Low | Deferred | Автообновление PoW-алгоритма при смене `DeepSeekHashV1` |
+| KI-1015 | R-09-03 | 🟢 Low | Deferred | Web UI настройки вместо `pnpm webauth` |
