@@ -168,6 +168,30 @@ describe('POST /v1/chat/completions (K1)', () => {
     expect(response.json().error.type).toBe('invalid_request_error');
   });
 
+  it('200: принимает store и max_completion_tokens (DSH)', async () => {
+    const app = await buildApp({
+      sendChat: sendChatWith([{ type: 'text', content: 'ok' }]),
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: { ...USER_PAYLOAD, store: true, max_completion_tokens: 100 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().choices[0].message.content).toBe('ok');
+  });
+
+  it('400: неизвестное поле (schema.strict)', async () => {
+    const app = await buildApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: { ...USER_PAYLOAD, foo: 'bar' },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.type).toBe('invalid_request_error');
+  });
+
   it('401: auth.json отсутствует', async () => {
     const app = await buildApp({ loadAuth: () => Promise.reject(new AuthNotFoundError()) });
     const response = await app.inject({

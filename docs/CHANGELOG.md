@@ -12,7 +12,13 @@
 
 ## [Unreleased]
 
-Изменений после 0.5.0 нет.
+### Fixed
+
+- Zod-схема `POST /v1/chat/completions` расширена для совместимости с DSH:
+  принимаются `store`, `max_completion_tokens`, `n`, `seed`,
+  `response_format`, `user`, `parallel_tool_calls` (не используются —
+  DeepSeek Web API их не поддерживает); неизвестные поля по-прежнему
+  отклоняются `.strict()`; обновлён `docs/api-contract.json`.
 
 ---
 

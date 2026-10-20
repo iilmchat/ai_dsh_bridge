@@ -70,10 +70,10 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | `src/translate/assemble.ts` | `assembleTextFromEvents`: текст из SET/APPEND/text + `accumulated_token_usage` из BATCH |
 | `src/translate/sse-writer.ts` | `writeOpenAiSse`: OpenAI SSE-чанки; `id`/`name` только в первом `tool_calls`-чанке, continuation без них, `[DONE]`, usage |
 | `src/api/completions.ts` | Обработчик `POST /v1/chat/completions` (JSON + SSE), DI-зависимости, коды 400/401/502/503 |
-| `src/api/completions.schema.ts` | Zod-схема запроса (strict): model, messages, tools, tool_choice, stream, stream_options, top_p, penalties, stop, temperature, max_tokens |
+| `src/api/completions.schema.ts` | Zod-схема запроса (strict): model, messages, tools, tool_choice, stream, stream_options, top_p, penalties, stop, store, max_completion_tokens, n, seed, response_format, user, parallel_tool_calls |
 | `src/translate/types.ts` | `OpenAiMessage`, `OpenAiToolCall`, `OpenAiTool`, `ChatCompletionRequest/Response` (L1/L2) |
 | `src/auth/webauth.ts` | Chrome CDP :9222, извлечение `ds_session_id`/`aws-waf-token`/Bearer, `auth.json` 0600, таймаут 5 мин |
-| `test/` | **105 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream) |
+| `test/` | **107 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream) |
 | `scripts/e2e-deepseek.ts` | Живой e2e (`pnpm e2e:deepseek`): сессия → PoW → SSE → сборка текста, лог в `docs/captures/` с `<REDACTED>` |
 | `scripts/e2e-tools.ts` | Диагностика DSML (`pnpm e2e:tools`): prompt+tools → DeepSeek → `parseDsml`; `--prompt-only`, лог `e2e-tools-*.log` |
 | `.oxlintrc.json` | Конфиг oxlint: правила из RULES § 1/§ 4, `any` и `floating-promises` запрещены (KI-008 Fixed) |
@@ -203,7 +203,7 @@ KI-007, KI-014, KI-015. Полные описания и планы —
 
 | Метрика | Значение | Источник |
 |---|---|---|
-| Backend-тесты | **105** | `test/*.test.ts` (…/api-completions, api-completions-stream) |
+| Backend-тесты | **107** | `test/*.test.ts` (…/api-completions, api-completions-stream) |
 | Open KI | **3** | `docs/KNOWN_ISSUES.md` |
 | Всего KI | 16 (3 Open, 10 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |

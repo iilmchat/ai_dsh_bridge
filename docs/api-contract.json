@@ -1,5 +1,28 @@
 {
   "version": 1,
+  "requests": {
+    "ChatCompletionRequest": [
+      "frequency_penalty",
+      "max_completion_tokens",
+      "max_tokens",
+      "messages",
+      "model",
+      "n",
+      "parallel_tool_calls",
+      "presence_penalty",
+      "response_format",
+      "seed",
+      "stop",
+      "store",
+      "stream",
+      "stream_options",
+      "temperature",
+      "tool_choice",
+      "tools",
+      "top_p",
+      "user"
+    ]
+  },
   "responses": {
     "ChatCompletionResponse": [
       "choices",

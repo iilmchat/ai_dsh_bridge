@@ -61,9 +61,23 @@ export const ChatCompletionRequestSchema = z
     temperature: z.number().min(0).max(2).optional(),
     top_p: z.number().min(0).max(1).optional(),
     max_tokens: z.number().int().positive().optional(),
+    max_completion_tokens: z.number().int().positive().optional(),
     frequency_penalty: z.number().min(-2).max(2).optional(),
     presence_penalty: z.number().min(-2).max(2).optional(),
     stop: z.union([z.string(), z.array(z.string())]).nullable().optional(),
+    // Принимаются для совместимости с DSH/OpenAI, но DeepSeek Web API их
+    // не поддерживает и шлюз их не использует.
+    store: z.boolean().optional(),
+    n: z.number().int().min(1).max(5).optional(),
+    seed: z.number().int().optional(),
+    response_format: z
+      .object({
+        type: z.enum(['text', 'json_object']),
+      })
+      .strict()
+      .optional(),
+    user: z.string().optional(),
+    parallel_tool_calls: z.boolean().optional(),
   })
   .strict();
 
