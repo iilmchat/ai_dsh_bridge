@@ -6,13 +6,14 @@
 один раз, а `tool_calls` эмулируются DSML-разметкой в prompt с корректным
 SSE-стримингом — без `UNKNOWN_TOOL`.
 
-> **Статус: v0.6.0-alpha (scaffold).** Работают `GET /health`, `GET /v1/models`,
+> **Статус: v0.6.1 (scaffold).** Работают `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
 > `POST /v1/chat/completions` в обоих режимах — `stream: false` (JSON) и
-> `stream: true` (OpenAI SSE с `tool_calls`). DSH подключается как
-> Custom Provider; сквозной tool-call цикл подтверждён живым e2e DSH
-> (`bash` выполнен, результат возвращён в модель)
-> (см. [DESIGN § 10](docs/DESIGN.md#10-этапы-реализации)).
+> `stream: true` (OpenAI SSE с `tool_calls`). Изображения из `content`
+> (`image_url`) загружаются в DeepSeek через `upload_file` и передаются
+> как `ref_file_ids`. DSH подключается как Custom Provider; сквозной
+> tool-call цикл подтверждён живым e2e DSH (`bash` выполнен, результат
+> возвращён в модель) (см. [DESIGN § 10](docs/DESIGN.md#10-этапы-реализации)).
 
 > ⚠️ **Использование веб-сессии DeepSeek может нарушать условия сервиса и
 > привести к блокировке аккаунта.** Используйте отдельный аккаунт и только
@@ -108,11 +109,12 @@ pnpm e2e:tools -- --prompt-only  # только prompt, без сети
 
 ## Что дальше
 
-Планы развития — в [docs/ROADMAP.md](docs/ROADMAP.md):
-v0.6.0 — Vision & Multimodal (OCR/LLaVA, скриншоты; черновик архитектуры —
-[docs/DESIGN_V06_VISION.md](docs/DESIGN_V06_VISION.md)), v0.7.0 —
-Performance & Reliability (ускорение PoW, инкрементальный streaming,
-сессии), v0.8.0 — Ecosystem (npm/Docker/reasoner/метрики), v0.9.0 —
+Планы развития — в [docs/ROADMAP.md](docs/ROADMAP.md). v0.6.0
+(Vision & Multimodal) закрыта: скриншот и OCR через `bash`, изображения —
+нативно через `upload_file` + `ref_file_ids` (LLaVA отложена, отдельная
+обёртка `screenshot` не нужна). Следующая — v0.7.0 Performance &
+Reliability (ускорение PoW, инкрементальный streaming, автовосстановление
+сессии), затем v0.8.0 Ecosystem (npm/Docker/reasoner/метрики) и v0.9.0
 Advanced (CDP-fallback и др.). Идеи продублированы в
 [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) как backlog.
 

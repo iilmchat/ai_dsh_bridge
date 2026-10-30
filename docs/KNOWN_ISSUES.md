@@ -1,8 +1,8 @@
 # Известные проблемы AI DSH Bridge
 
-**Версия реестра:** 0.6.0-alpha
+**Версия реестра:** 0.6.1
 **Дата последнего обновления:** 2026-10-20
-**Статус проекта:** v0.6.0-alpha (scaffold)
+**Статус проекта:** v0.6.1 (scaffold)
 
 Формат: `KI-XXX` — название, приоритет, статус, файлы.
 Приоритеты: 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low
@@ -19,23 +19,23 @@
 
 | Статус | Количество | Записи |
 |---|---|---|
-| Open | 2 | KI-014, KI-015 |
+| Open | 3 | KI-014, KI-015, KI-1016 |
 | In Progress | 0 | — |
 | Fixed | 11 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-007, KI-008, KI-009, KI-011, KI-012, KI-016 |
 | Documented | 1 | KI-001 |
 | Deferred | 1 | KI-010 |
 | Won't Fix | 1 | KI-013 |
-| **Всего** | **16** | — |
+| **Всего** | **17** | — |
 
 ### Приоритеты
 
 | Приоритет | Количество | Записи |
 |---|---|---|
 | 🔴 Critical | 1 | KI-005 |
-| 🟠 High | 5 | KI-002, KI-003, KI-004, KI-006, KI-007 |
+| 🟠 High | 6 | KI-002, KI-003, KI-004, KI-006, KI-007, KI-1016 |
 | 🟡 Medium | 7 | KI-008, KI-009, KI-011, KI-012, KI-013, KI-014, KI-016 |
 | 🟢 Low | 3 | KI-001, KI-010, KI-015 |
-| **Всего** | **16** | — |
+| **Всего** | **17** | — |
 
 ### Связь с этапами DESIGN § 10
 
@@ -313,6 +313,8 @@
 
 ---
 
+## v0.6.1 — Vision images (2026-10-20)
+
 ### KI-1016 — SSRF: `http(s)` image_url скачивается без allowlist (Open)
 - **Приоритет:** 🟠 High | **Статус:** Open | **Обнаружено:** 2026-10-20
 - **Файлы:** `src/api/completions.ts` (скачивание `image_url` c `http(s)`)
@@ -452,6 +454,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.5.6 | 2026-10-20 | cwd awareness в Prompt Builder (`pwd`/`cd`, не предполагать корень); 116 тестов |
 | 0.5.7 | 2026-10-20 | Инструкция показывать вывод инструментов (`pwd`/`ls`/`cat`), не отвечать «Готово»; 117 тестов |
 | 0.6.0-alpha | 2026-10-20 | S1/S2 Vision: few-shot скриншота через PowerShell и OCR через `tesseract` (полный путь + `where tesseract`); fallback показывает последний tool-результат; 123 теста |
+| 0.6.1 | 2026-10-20 | S3: изображения через `upload_file` + `ref_file_ids`; KI-1003 → Fixed; добавлен KI-1016 (SSRF `image_url`); 136 тестов |
 
 ---
 
@@ -465,9 +468,9 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | ID | Roadmap | Приоритет | Статус | Кратко |
 |---|---|---|---|---|
 | KI-1001 | R-06-01 | 🔴 Critical | Done | OCR (Tesseract) через `bash` — реализован в 0.6.0-alpha (S2: few-shot, полный путь + `where tesseract`) |
-| KI-1002 | R-06-02 | 🟠 High | Planned | Локальная vision-модель (Ollama/LLaVA) — описание сцены |
-| KI-1003 | R-06-03 | 🟡 Medium | Fixed | Изображения в DeepSeek Web: `upload_file` + `ref_file_ids` при `model_type: default` (S3, 0.6.0-alpha) — детали ниже |
-| KI-1004 | R-06-04 | 🟠 High | In Progress | Инструмент `screenshot` (обёртка `screenshot-desktop`, base64 + путь) |
+| KI-1002 | R-06-02 | 🟠 High | Deferred | Локальная vision-модель (Ollama/LLaVA) — S3 даёт нативное зрение, отдельная модель дублирует путь; пересмотр — при отказе DeepSeek от изображений |
+| KI-1003 | R-06-03 | 🟡 Medium | Fixed | Изображения в DeepSeek Web: `upload_file` + `ref_file_ids` при `model_type: default` (S3, 0.6.1) — детали ниже |
+| KI-1004 | R-06-04 | 🟠 High | Won't Fix | Инструмент `screenshot` (обёртка `screenshot-desktop`, base64 + путь) — S1 закрыт few-shot `bash`, S3 доставляет изображения нативно |
 | KI-1005 | R-07-01 | 🟠 High | Planned | PoW через `worker_threads` — цель ~150 мс вместо ~500 мс |
 | KI-1006 | R-07-02 | 🟠 High | Planned | Инкрементальный streaming DSML — первый SSE-чанк без полной буферизации |
 | KI-1007 | R-07-03 | 🟠 High | Planned | Ротация/пересоздание `chat_session_id` при 401 без ручного `webauth` |

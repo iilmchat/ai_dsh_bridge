@@ -56,15 +56,15 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | Документация | DESIGN, ARCHITECTURE, GETTING_STARTED, RULES, KNOWN_ISSUES, CHANGELOG, RELEASES, KI_GITHUB_SYNC, api-contract.json |
 | Каркас | Node.js 22+, TypeScript 6 strict ESM, `tsconfig.json` / `tsconfig.build.json`, Vitest 4, oxlint, pnpm-lock, `LICENSE` (MIT) |
 | `src/index.ts` | Fastify 5, pino, graceful shutdown, loopback `127.0.0.1:PORT` |
-| `GET /health` | `{ status: "ok", version: "0.6.0-alpha", uptime_sec }` |
+| `GET /health` | `{ status: "ok", version: "0.6.1", uptime_sec }` |
 | `GET /v1/models` | `deepseek-web-chat`, `deepseek-web-reasoner`; каждая карточка содержит `capabilities` (`tools`, `function_calling`, `streaming`) для DSH |
-| `POST /v1/chat/completions` | JSON (`stream:false`) и SSE (`stream:true`): Zod → auth → Prompt Builder → DeepSeek → `assembleTextFromEvents` → DSML → JSON/чанки с `tool_calls`; usage по `include_usage` |
+| `POST /v1/chat/completions` | JSON (`stream:false`) и SSE (`stream:true`): Zod → auth → Prompt Builder → DeepSeek → `assembleTextFromEvents` → DSML → JSON/чанки с `tool_calls`; `image_url` (data/http) загружается в DeepSeek и передаётся через `ref_file_ids` (S3, 0.6.1); usage по `include_usage` |
 | `src/config.ts` | Zod-валидация окружения, значения по умолчанию, раскрытие `~` |
 | `docs/captures/` | Захваты 2026-10-19: `users/current`, `create_pow_challenge`, `chat/completion`, SSE; секреты `<REDACTED>`, вне git |
 | `src/deepseek/types.ts` | Zod-схемы `PowChallenge`, `PowResponse`, `ChatCompletionRequest` (DESIGN §4.1/§6.3) |
 | `src/deepseek/deepseek-hash.ts` | DeepSeekHashV1: SHA3-спonge, KECCAK-p[1600,23]; async-перебор nonce с уступкой event loop |
 | `src/deepseek/pow.ts` | `solvePowAsync`, base64 `x-ds-pow-response` (реальный challenge решён за ~570 мс) |
-| `src/deepseek/client.ts` | `createChatSessionAsync` (`/chat_session/create`), PoW-challenge под `/api/v0/chat/completion`, SSE-парсер JSON Patch, ретраи `40301`, `AuthExpiredError`, `validateSessionAsync`, `safeBodyPreview` |
+| `src/deepseek/client.ts` | `createChatSessionAsync` (`/chat_session/create`), PoW-challenge под `/api/v0/chat/completion`, SSE-парсер JSON Patch, ретраи `40301`, `AuthExpiredError`, `validateSessionAsync`, `safeBodyPreview`; `uploadFileAsync`/`fetchFilesAsync` для изображений (S3) |
 | `src/translate/prompt.ts` | Prompt Builder: DSML-инструкция, `toolChoice`, инструкции про `tool`-результат, `bash`, файлы, вывод команд, cwd; few-shot: мышь (pyautogui), скриншот (PowerShell), OCR (tesseract); `PromptValidationError` |
 | `src/translate/dsml-parser.ts` | Non-streaming DSML-парсер: `{ text, tool_calls, warnings }`, нормализация pipe-маркеров, fail-safe (DESIGN § 5.2), финальная очистка `text` от маркеров (0.5.4) |
 | `src/translate/assemble.ts` | `assembleTextFromEvents`: текст из SET/APPEND/text + `accumulated_token_usage` из BATCH |
@@ -73,39 +73,41 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | `src/api/completions.schema.ts` | Zod-схема запроса (strict): model, messages, tools, tool_choice, stream, stream_options, top_p, penalties, stop, store, max_completion_tokens, n, seed, response_format, user, parallel_tool_calls |
 | `src/translate/types.ts` | `OpenAiMessage`, `OpenAiToolCall`, `OpenAiTool`, `ChatCompletionRequest/Response` (L1/L2) |
 | `src/auth/webauth.ts` | Chrome CDP :9222, извлечение `ds_session_id`/`aws-waf-token`/Bearer, `auth.json` 0600, таймаут 5 мин |
-| `test/` | **123 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream, api-models) |
+| `test/` | **136 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream, api-models) |
 | `scripts/e2e-deepseek.ts` | Живой e2e (`pnpm e2e:deepseek`): сессия → PoW → SSE → сборка текста, лог в `docs/captures/` с `<REDACTED>` |
 | `scripts/e2e-tools.ts` | Диагностика DSML (`pnpm e2e:tools`): prompt+tools → DeepSeek → `parseDsml`; `--prompt-only`, лог `e2e-tools-*.log` |
 | `.oxlintrc.json` | Конфиг oxlint: правила из RULES § 1/§ 4, `any` и `floating-promises` запрещены (KI-008 Fixed) |
 | `.env` | Опционален; нативно `--env-file-if-exists=.env` в `dev`/`start`/`webauth` (KI-009/KI-012 Fixed) |
 
-### 2.2. Что не реализовано (этапы 5–8)
+### 2.2. Что не реализовано (Этап 8 и далее)
 
 `pnpm webauth`, клиент DeepSeek с PoW (0.2.0), Prompt Builder (0.3.0),
-DSML-парсер (0.3.1) и `POST /v1/chat/completions` в обоих режимах (0.4.0
-JSON, 0.5.0 SSE) готовы; живой e2e DeepSeek проходит (`[8] E2E OK`).
-Не реализовано: CDP-fallback транспорта, точный учёт
-prompt/completion-токенов (DeepSeek отдаёт только
-`accumulated_token_usage`), автоматический e2e-тест DSH (живой e2e уже
-подтверждён вручную). В 0.5.1 добавлен fallback пустого `content` после
-tool-результата. WAF-заголовки `x-hif-*` не нужны (KI-013 Won't Fix).
-Ссылки на этапы — в § 6.
+DSML-парсер (0.3.1), `POST /v1/chat/completions` в обоих режимах (0.4.0
+JSON, 0.5.0 SSE) и изображения через `upload_file` + `ref_file_ids` (0.6.1)
+готовы; живой e2e DeepSeek проходит (`[8] E2E OK`), модель описывает
+загруженную картинку. Не реализовано: инкрементальный streaming (сейчас
+ответ буферизуется до полной сборки), автовосстановление сессии при 401,
+CDP-fallback транспорта, точный учёт prompt/completion-токенов (DeepSeek
+отдаёт только `accumulated_token_usage`), автоматический e2e-тест DSH
+(живой e2e подтверждён вручную). WAF-заголовки `x-hif-*` не нужны
+(KI-013 Won't Fix). Ссылки на этапы — в § 6.
 
 ### 2.3. Состояние реестра проблем (актуально на 2026-10-20)
 
-Всего в реестре **16** записей: **2 Open**, 11 Fixed (KI-002 — SSE-роут,
+Всего в реестре **17** записей: **3 Open**, 11 Fixed (KI-002 — SSE-роут,
 KI-003 — webauth, KI-004 — клиент+PoW, KI-005 — слой трансляции,
 KI-006 — SSE-writer, KI-007 — живой DSH e2e, KI-008 — `.oxlintrc.json`,
 KI-009 — `.env`, KI-011 — `LICENSE`, KI-012 — `--env-file-if-exists`,
 KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documented
 (KI-001 — шаблон), 1 Deferred (KI-010), 1 Won't Fix (KI-013 — WAF не
-обязателен). Открытые: KI-014, KI-015. Полные описания и планы —
+обязателен). Открытые: KI-014, KI-015, KI-1016. Полные описания и планы —
 [docs/KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 | KI | Приоритет | Суть |
 |---|---|---|
 | KI-014 | 🟡 Medium | PoW-решатель на JS ~570 мс (цель 100–500 мс) |
 | KI-015 | 🟢 Low | `webauth`: ветка подключения к уже запущенному Chrome не проверена вживую |
+| KI-1016 | 🟠 High | SSRF: http(s)-`image_url` скачивается без allowlist и запрета приватных IP |
 
 ---
 
@@ -124,11 +126,14 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 | Менеджер | pnpm | lock-файл коммитится; npm/yarn запрещены |
 
 Скрипты (`package.json`): `pnpm dev` (`tsx watch --env-file-if-exists=.env`),
+`pnpm dev:kill` (остановить процесс на :3456 и запустить `dev`),
 `pnpm build` (`tsc -p tsconfig.build.json`), `pnpm start`
 (`node --env-file-if-exists=.env dist/index.js`), `pnpm webauth`
 (`tsx --env-file-if-exists=.env src/auth/webauth.ts` — реализован в 0.2.0),
 `pnpm test`, `pnpm test:watch`, `pnpm lint`, `pnpm typecheck`,
-`pnpm e2e:deepseek` (`tsx scripts/e2e-deepseek.ts`).
+`pnpm e2e:deepseek` (`tsx scripts/e2e-deepseek.ts`),
+`pnpm e2e:tools` (`tsx scripts/e2e-tools.ts`), `pnpm run version`
+(`pnpm version` зарезервирована pnpm).
 
 ---
 
@@ -202,13 +207,13 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 
 | Метрика | Значение | Источник |
 |---|---|---|
-| Backend-тесты | **123** | `test/*.test.ts` (…/api-completions, api-models) |
-| Open KI | **2** | `docs/KNOWN_ISSUES.md` |
-| Всего KI | 16 (2 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
+| Backend-тесты | **136** | `test/*.test.ts` (…/api-completions, api-models) |
+| Open KI | **3** | `docs/KNOWN_ISSUES.md` |
+| Всего KI | 17 (3 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
-| Версия | 0.6.1 | `package.json` |
+| Версия | 0.6.1 | `package.json`, `src/index.ts` |
 | Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
-| Покрытие тестами | 123 тестов; живой e2e DSH подтверждён вручную | — |
+| Покрытие тестами | 136 тестов; живой e2e DSH подтверждён вручную | — |
 
 Правило: если в ответе приводится метрика (число тестов, Open KI, версия),
 она должна совпадать с этим разделом. Расхождение — повод обновить
@@ -332,13 +337,14 @@ Refs: KI-006, DESIGN § 5.3
 
 ## 8. Roadmap
 
-Развитие зафиксировано в [docs/ROADMAP.md](ROADMAP.md):
-v0.6.0 — Vision & Multimodal (OCR/LLaVA/скриншоты), v0.7.0 — Performance
-& Reliability (PoW, инкрементальный streaming, сессии), v0.8.0 — Ecosystem
-(npm/Docker/reasoner/метрики), v0.9.0 — Advanced (CDP-fallback, автообновление
-PoW, Web UI). Backlog-идеи ведутся как `KI-1001…KI-1015` в
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) и не входят в сводку активных KI.
-При выборе задачи сверяйся с ROADMAP и реестром.
+Развитие зафиксировано в [docs/ROADMAP.md](ROADMAP.md): v0.6.0 — Vision &
+Multimodal — **Done** (S1 OCR, S2 скриншот, S3 `ref_file_ids`; LLaVA —
+Deferred, обёртка `screenshot` — Won't Fix). Следующая — v0.7.0 Performance
+& Reliability (PoW, инкрементальный streaming, автовосстановление сессии),
+затем v0.8.0 Ecosystem (npm/Docker/reasoner/метрики), v0.9.0 Advanced
+(CDP-fallback, автообновление PoW, Web UI). Backlog-идеи ведутся как
+`KI-1001…KI-1016` в [KNOWN_ISSUES.md](KNOWN_ISSUES.md), кроме KI-1016 —
+это активный дефект (SSRF). При выборе задачи сверяйся с ROADMAP и реестром.
 
 ---
 

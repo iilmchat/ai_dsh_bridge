@@ -7,10 +7,10 @@
 Документ описывает обязательную процедуру выпуска версии: от заморозки
 состава до проверки после публикации и отката. Все команды выполняются в
 **PowerShell 7 (pwsh)** из корня репозитория. Пример использует текущую
-версию `0.6.0-alpha`; для следующих релизов меняется только значение `$Version`.
+версию `0.6.1`; для следующих релизов меняется только значение `$Version`.
 
 ```powershell
-$Version   = '0.6.0-alpha'                 # SemVer без префикса v
+$Version   = '0.6.1'                       # SemVer без префикса v
 $Tag       = "v$Version"
 $RepoRoot  = (Get-Location).Path           # запуск из корня репозитория
 Set-Location $RepoRoot
@@ -62,7 +62,7 @@ git switch -c "release/v$Version"
 - [ ] `pnpm install --frozen-lockfile` — без обновления lock-файла.
 - [ ] `pnpm lint` — без ошибок (oxlint, type-aware).
 - [ ] `pnpm typecheck` — `tsc --noEmit`, без ошибок.
-- [ ] `pnpm test` — зелёный; тестовые файлы существуют (сейчас 9 suite,
+- [ ] `pnpm test` — зелёный; тестовые файлы существуют (сейчас 10 suite,
       включая SSE-контракт `api-completions-stream.test.ts`).
 - [ ] `pnpm build` — без ошибок и **без warning-ов** TypeScript.
 - [ ] Smoke-проверка запущенного фасада (§ 2.5).
@@ -90,7 +90,7 @@ if ($warnings.Count -gt 0) {
 }
 
 # 2.4. Проверка, что тесты действительно существуют.
-# С 0.5.0 в test/ есть 9 suite; если файлов нет — это регрессия, релиз
+# С 0.6.1 в test/ есть 10 suite; если файлов нет — это регрессия, релиз
 # блокируется (зелёный прогон с --passWithNoTests ничего не доказывает).
 $testFiles = @(Get-ChildItem test -Filter '*.test.ts' -File -ErrorAction SilentlyContinue)
 if ($testFiles.Count -eq 0) {
