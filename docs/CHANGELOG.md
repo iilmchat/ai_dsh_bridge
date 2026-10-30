@@ -14,6 +14,20 @@
 
 ### Added
 
+### Changed
+
+### Fixed
+
+- `GET /health` отдавал `version: "0.6.0-alpha"`: `APP_VERSION` в
+  `src/index.ts` не был синхронизирован с `package.json` при релизе 0.6.1
+  (RELEASES § 4). Теперь `/health` возвращает `0.6.1`.
+
+---
+
+## [0.6.1] — 2026-10-20
+
+### Added
+
 - S3: поддержка изображений (`image_url`) в `POST /v1/chat/completions`:
   `data:image/...;base64,...` и http(s)-URL загружаются в DeepSeek
   (`POST /api/v0/file/upload_file`, multipart, PoW), шлюз ждёт разбора
@@ -46,7 +60,7 @@
 
 ### Fixed
 
-- KI-1003 (Base64-картинки в DeepSeek Web) → Fixed (S3, 0.6.0-alpha):
+- KI-1003 (Base64-картинки в DeepSeek Web) → Fixed (S3, 0.6.1):
   изображения передаются через `upload_file` + `ref_file_ids`; проверено
   живым e2e (модель описала загруженную картинку). Захваты:
   `docs/captures/upload-file-2026-10-20.http`,
