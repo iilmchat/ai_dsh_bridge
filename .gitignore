@@ -9,6 +9,10 @@ coverage/
 .DS_Store
 Thumbs.db
 
+# Артефакты smoke-проверок Vision (S1)
+/screenshot.png
+/screen.png
+
 # Захваты содержат реальные токены/cookie — только локально
 docs/captures/*.http
 docs/captures/*.sse
