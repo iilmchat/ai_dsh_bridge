@@ -8,6 +8,7 @@ import {
   buildGenerateRequestBody,
   createGeminiWebProvider,
   extractAccessToken,
+  GEMINI_WEB_MODEL_HEADERS,
 } from '../src/google/gemini-web.js';
 import type { GoogleAuth } from '../src/google/auth.js';
 import { ProviderRequestError } from '../src/providers/types.js';
@@ -196,6 +197,40 @@ describe('createGeminiWebProvider', () => {
     const form = decodeForm(rawBody);
     expect(form.at).toBe('AT-TOKEN');
     expect(form.prompt).toBe('СИСТЕМА\n\n[USER]\nпривет');
+  });
+
+  it('передаёт заголовок модели для flash и не передаёт для default', async () => {
+    const flashRequests: CapturedRequest[] = [];
+    const flashProvider = createProvider(flashRequests, () =>
+      framesBody([candidateFrame('ok')]),
+    );
+    await flashProvider.completeAsync({
+      upstreamModel: 'gemini-2.5-flash',
+      system: '',
+      conversation: 'q',
+    });
+    const flashGenerate = flashRequests.find((request) => request.init.method === 'POST');
+    if (flashGenerate === undefined) {
+      throw new Error('Запрос генерации не отправлен');
+    }
+    expect(headersOf(flashGenerate)['x-goog-ext-525001261-jspb']).toBe(
+      GEMINI_WEB_MODEL_HEADERS['gemini-2.5-flash'],
+    );
+
+    const defaultRequests: CapturedRequest[] = [];
+    const defaultProvider = createProvider(defaultRequests, () =>
+      framesBody([candidateFrame('ok')]),
+    );
+    await defaultProvider.completeAsync({
+      upstreamModel: 'gemini-web',
+      system: '',
+      conversation: 'q',
+    });
+    const defaultGenerate = defaultRequests.find((request) => request.init.method === 'POST');
+    if (defaultGenerate === undefined) {
+      throw new Error('Запрос генерации не отправлен');
+    }
+    expect(headersOf(defaultGenerate)['x-goog-ext-525001261-jspb']).toBeUndefined();
   });
 
   it('кэширует SNlM0e между запросами', async () => {

@@ -70,6 +70,35 @@ describe('runGeminiE2EAsync', () => {
     expect(written).not.toContain('secret-cookie-value');
   });
 
+  it('передаёт выбранную upstream-модель в провайдер', async () => {
+    let seen = '';
+    const provider: ChatProvider = {
+      id: 'google-gemini-web',
+      isConfiguredAsync: async () => true,
+      completeAsync: async (request) => {
+        seen = request.upstreamModel;
+        return { text: 'ok', usage: { promptTokens: 0, completionTokens: 0 } };
+      },
+    };
+
+    await runGeminiE2EAsync({
+      mode: 'web',
+      upstreamModel: 'gemini-2.5-pro',
+      loadAuth: async () => TEST_AUTH,
+      resolveToken: async () => 'AT-TOKEN',
+      webProvider: () => provider,
+      log: () => {
+        // Вывод в тестах не нужен.
+      },
+      writeLog: async () => {
+        // Запись лога в тестах не нужна.
+      },
+      logDirectory: TEST_LOG_DIR,
+    });
+
+    expect(seen).toBe('gemini-2.5-pro');
+  });
+
   it('api: использует переданный провайдер и фиксирует успех', async () => {
     let written = '';
     const result = await runGeminiE2EAsync({

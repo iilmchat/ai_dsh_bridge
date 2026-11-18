@@ -51,6 +51,18 @@ const ERROR_USAGE_LIMIT = 1037;
 /** Код ошибки Google: заголовок/структура модели устарели. */
 const ERROR_MODEL_INVALID = 1052;
 
+/**
+ * Заголовки выбора модели Gemini Web (`x-goog-ext-525001261-jspb`).
+ *
+ * Значения — непрозрачные идентификаторы модели у Google; взяты из открытой
+ * реализации `gemini_webapi` v1.14.4 и подтверждены живым e2e 2026-11-18.
+ * Если Google их сменит, upstream вернёт код 1052 (KI-1019).
+ */
+export const GEMINI_WEB_MODEL_HEADERS: Readonly<Record<string, string>> = {
+  'gemini-2.5-flash': '[1,null,null,null,"71c2d248d3b102ff"]',
+  'gemini-2.5-pro': '[1,null,null,null,"2525e3954d185b3c"]',
+};
+
 /** Код ошибки Google: IP временно заблокирован. */
 const ERROR_IP_BLOCKED = 1060;
 
@@ -64,6 +76,8 @@ export interface GeminiWebProviderOptions {
   readonly timeoutMs?: number | undefined;
   /** Заголовок выбора модели `x-goog-ext-525001261-jspb` (опционально). */
   readonly modelHeader?: string | undefined;
+  /** Карта `upstreamModel → заголовок модели` (по умолчанию `GEMINI_WEB_MODEL_HEADERS`). */
+  readonly modelHeaders?: Readonly<Record<string, string>> | undefined;
   /** Функция HTTP-запроса (по умолчанию `fetch`). */
   readonly fetchImpl?: FetchAsync | undefined;
   /** Часы (для тестов TTL access token). */
@@ -364,6 +378,12 @@ export const createGeminiWebProvider = (options: GeminiWebProviderOptions): Chat
     };
     if (options.modelHeader !== undefined && options.modelHeader !== '') {
       headers['x-goog-ext-525001261-jspb'] = options.modelHeader;
+    } else {
+      const modelHeaders = options.modelHeaders ?? GEMINI_WEB_MODEL_HEADERS;
+      const modelHeader = modelHeaders[request.upstreamModel];
+      if (modelHeader !== undefined && modelHeader !== '') {
+        headers['x-goog-ext-525001261-jspb'] = modelHeader;
+      }
     }
 
     let response: HttpResponseLike;

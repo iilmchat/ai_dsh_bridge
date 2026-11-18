@@ -20,6 +20,14 @@ export interface ProviderUsage {
 /** Usage по умолчанию: веб-чат Google не отдаёт токены. */
 export const ZERO_USAGE: ProviderUsage = { promptTokens: 0, completionTokens: 0 };
 
+/** Изображение для мультимодального запроса (base64 + MIME-тип). */
+export interface ProviderImage {
+  /** MIME-тип (`image/png`, `image/jpeg`, …). */
+  readonly mimeType: string;
+  /** Данные изображения в base64 (без `data:`-префикса). */
+  readonly data: string;
+}
+
 /** Запрос на завершение, уже переведённый в текстовый формат (L2). */
 export interface ProviderCompletionRequest {
   /** Имя модели upstream (например, `gemini-2.5-flash`). */
@@ -28,6 +36,8 @@ export interface ProviderCompletionRequest {
   readonly system: string;
   /** Транскрипт диалога в разметке `[USER]`/`[ASSISTANT]`/`[TOOL_RESULT]`. */
   readonly conversation: string;
+  /** Изображения из `image_url` (провайдеры без поддержки их игнорируют). */
+  readonly images?: readonly ProviderImage[] | undefined;
   /** Температура из запроса DSH (если задана). */
   readonly temperature?: number | undefined;
   /** Лимит выходных токенов из запроса DSH (если задан). */

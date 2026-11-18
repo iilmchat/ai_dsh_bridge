@@ -6,7 +6,7 @@
 один раз, а `tool_calls` эмулируются DSML-разметкой в prompt с корректным
 SSE-стримингом — без `UNKNOWN_TOOL`.
 
-> **Статус: v0.6.2 (scaffold).** Работают `GET /health`, `GET /v1/models`,
+> **Статус: v0.6.3 (scaffold).** Работают `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
 > `POST /v1/chat/completions` в обоих режимах — `stream: false` (JSON) и
 > `stream: true` (OpenAI SSE с `tool_calls`). Изображения из `content`
@@ -14,9 +14,12 @@ SSE-стримингом — без `UNKNOWN_TOOL`.
 > как `ref_file_ids`. С 0.6.2 подключён **Google ИИ-чат** двумя путями:
 > официальный **Gemini API** по ключу (`google-gemini-api-flash`/`-pro`) и
 > веб-чат **`gemini.google.com`** по cookie-сессии (`google-gemini-web`,
-> `pnpm webauth:google`). DSH подключается как Custom Provider; сквозной
-> tool-call цикл подтверждён живым e2e DSH (`bash` выполнен, результат
-> возвращён в модель) (см. [DESIGN § 10](docs/DESIGN.md#10-этапы-реализации)
+> `pnpm webauth:google`). В 0.6.3 Gemini API принимает изображения
+> (`inlineData`), а веб-чат получил выбор модели (`-flash`/`-pro`);
+> веб-протокол подтверждён живым e2e. DSH подключается как Custom Provider;
+> сквозной tool-call цикл подтверждён живым e2e DSH (`bash` выполнен,
+> результат возвращён в модель) (см.
+> [DESIGN § 10](docs/DESIGN.md#10-этапы-реализации)
 > и [DESIGN_GOOGLE.md](docs/DESIGN_GOOGLE.md)).
 
 > ⚠️ **Использование веб-сессии DeepSeek может нарушать условия сервиса и
@@ -87,7 +90,7 @@ Invoke-RestMethod http://localhost:3456/v1/models
 |---|---|
 | Base URL | `http://localhost:3456/v1` |
 | API Key | любая непустая строка, например `sk-dummy` (шлюз ключ не проверяет) |
-| Model | `deepseek-web-chat` (также доступны `deepseek-web-reasoner`, `google-gemini-api-flash`, `google-gemini-api-pro`, `google-gemini-web`) |
+| Model | `deepseek-web-chat` (также доступны `deepseek-web-reasoner`, `google-gemini-api-flash`, `google-gemini-api-pro`, `google-gemini-web`, `google-gemini-web-flash`, `google-gemini-web-pro`) |
 
 > В некоторых сборках DSH поле называется `openaiURL` и требует **полный
 > URL** эндпоинта — тогда укажите
@@ -105,7 +108,8 @@ Invoke-RestMethod http://localhost:3456/v1/models
 2. Добавьте в `.env`: `GEMINI_API_KEY=...` (опционально
    `GEMINI_API_BASE_URL`, `GEMINI_TIMEOUT_MS=120000`).
 3. Перезапустите `pnpm dev` и выберите в DSH модель
-   `google-gemini-api-flash` или `google-gemini-api-pro`.
+   `google-gemini-api-flash` или `google-gemini-api-pro`. Модели принимают
+   изображения (`image_url`) и передают их как `inlineData`.
 
 ### Gemini Web (cookie-сессия `gemini.google.com`)
 
@@ -118,10 +122,11 @@ pnpm webauth:google
 вручную** — после входа шлюз сохранит cookie в
 `~/.ai-dsh-bridge/google-auth.json` (права `0600`, файл вне репозитория).
 Таймаут ожидания входа — 5 минут. Затем выберите в DSH модель
-`google-gemini-web`.
+`google-gemini-web` (модель Google по умолчанию),
+`google-gemini-web-flash` или `google-gemini-web-pro`.
 
 > Веб-чат — неофициальный путь: протокол может измениться без предупреждения
-> (KI-1017, KI-1019), изображения пока не поддерживаются (KI-1018).
+> (KI-1019), изображения в веб-чате не поддерживаются (KI-1018).
 > Использование веб-чата может нарушать условия Google — отдельный аккаунт.
 
 ## Проверка
@@ -156,7 +161,9 @@ pnpm e2e:tools -- --prompt-only  # только prompt, без сети
 (Vision & Multimodal) закрыта: скриншот и OCR через `bash`, изображения —
 нативно через `upload_file` + `ref_file_ids` (LLaVA отложена, отдельная
 обёртка `screenshot` не нужна). v0.6.2 добавила Google-провайдеры (Gemini API
-и Gemini Web) — см. [DESIGN_GOOGLE.md](docs/DESIGN_GOOGLE.md). Следующая —
+и Gemini Web), v0.6.3 — изображения для Gemini API, модели
+`google-gemini-web-flash`/`-pro` и живой e2e веб-протокола; см.
+[DESIGN_GOOGLE.md](docs/DESIGN_GOOGLE.md). Следующая —
 v0.7.0 Performance & Reliability (ускорение PoW, инкрементальный streaming,
 автовосстановление сессии), затем v0.8.0 Ecosystem (npm/Docker/reasoner/метрики)
 и v0.9.0 Advanced (CDP-fallback и др.). Идеи продублированы в

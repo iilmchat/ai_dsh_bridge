@@ -1,10 +1,10 @@
 # AI DSH Bridge — руководство по началу работы
 
-**Версия:** 0.6.2 (scaffold)
+**Версия:** 0.6.3 (scaffold)
 **Дата:** 2026-11-18
 **Связанные документы:** [DESIGN.md](./DESIGN.md), [DESIGN_GOOGLE.md](./DESIGN_GOOGLE.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [RULES.md](./RULES.md), [KNOWN_ISSUES.md](./KNOWN_ISSUES.md)
 
-> **Что уже работает в v0.6.2.** `GET /health`, `GET /v1/models`,
+> **Что уже работает в v0.6.3.** `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, `pnpm webauth:google`, клиент DeepSeek с PoW, Prompt
 > Builder, DSML-парсер и `POST /v1/chat/completions` в обоих режимах:
 > `stream: false` (JSON) и `stream: true` (OpenAI SSE с `tool_calls`).
@@ -15,7 +15,7 @@
 
 ## 0. Матрица готовности шагов
 
-| Шаг руководства | Что проверяет | Статус в v0.6.2 |
+| Шаг руководства | Что проверяет | Статус в v0.6.3 |
 |---|---|---|
 | §1–2. Требования и установка | Node.js 22+, pnpm, зависимости | ✅ доступно |
 | §4. Запуск каркаса | `pnpm dev`, `/health`, `/v1/models` | ✅ доступно |
@@ -137,7 +137,8 @@ GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
 GEMINI_TIMEOUT_MS=120000
 ```
 
-Модели: `google-gemini-api-flash`, `google-gemini-api-pro`.
+Модели: `google-gemini-api-flash`, `google-gemini-api-pro`; принимают
+изображения (`image_url` → `inlineData`).
 
 **Gemini Web (cookie-сессия `gemini.google.com`).**
 
@@ -149,12 +150,14 @@ pnpm webauth:google
 `~/.ai-dsh-bridge/chrome-profile`) на `https://gemini.google.com/app` и будет
 ждать входа до 5 минут. После входа cookie сохраняются в
 `~/.ai-dsh-bridge/google-auth.json` (права `0600`, вне репозитория).
-Модель: `google-gemini-web`. Access token `SNlM0e` не сохраняется — шлюз
+Модели: `google-gemini-web` (по умолчанию), `google-gemini-web-flash`,
+`google-gemini-web-pro`. Access token `SNlM0e` не сохраняется — шлюз
 перевыпускает его запросом `/app` и кэширует на 5 минут.
 
-> Веб-чат — неофициальный путь: протокол может измениться (KI-1017,
-> KI-1019), изображения пока не поддерживаются (KI-1018). Использование
-> веб-чата может нарушать условия Google — отдельный аккаунт.
+> Веб-чат — неофициальный путь: протокол проверен живым e2e 2026-11-18, но
+> может измениться (KI-1019), изображения в веб-чате не поддерживаются
+> (KI-1018; Gemini API изображения принимает). Использование веб-чата может
+> нарушать условия Google — отдельный аккаунт.
 
 ---
 
@@ -171,7 +174,7 @@ pnpm dev
 
 ```text
 {"level":30,"time":1760886000000,"pid":12345,"hostname":"dev","msg":"Server listening at http://127.0.0.1:3456"}
-{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.6.2 listening on http://127.0.0.1:3456"}
+{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.6.3 listening on http://127.0.0.1:3456"}
 ```
 
 Сервер слушает **только loopback** (`127.0.0.1`). Порт берётся из `PORT`
@@ -201,7 +204,7 @@ pnpm dev:kill
 pnpm run version
 ```
 
-Выводит текущую версию из `package.json` (например, `0.6.2`).
+Выводит текущую версию из `package.json` (например, `0.6.3`).
 Команда `pnpm version` зарезервирована самим pnpm (semver-bump), поэтому
 для вывода используется `pnpm run version`.
 
@@ -220,7 +223,7 @@ curl -s http://127.0.0.1:3456/health
 ```json
 {
   "status": "ok",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "uptime_sec": 12
 }
 ```
@@ -246,7 +249,9 @@ curl -s http://127.0.0.1:3456/v1/models
     { "id": "deepseek-web-reasoner", "object": "model", "created": 0, "owned_by": "deepseek-web" },
     { "id": "google-gemini-api-flash", "object": "model", "created": 0, "owned_by": "google-gemini-api" },
     { "id": "google-gemini-api-pro", "object": "model", "created": 0, "owned_by": "google-gemini-api" },
-    { "id": "google-gemini-web", "object": "model", "created": 0, "owned_by": "google-gemini-web" }
+    { "id": "google-gemini-web", "object": "model", "created": 0, "owned_by": "google-gemini-web" },
+    { "id": "google-gemini-web-flash", "object": "model", "created": 0, "owned_by": "google-gemini-web" },
+    { "id": "google-gemini-web-pro", "object": "model", "created": 0, "owned_by": "google-gemini-web" }
   ]
 }
 ```
@@ -256,7 +261,7 @@ Google-модели видны в списке всегда: доступнос�
 
 ### 4.4. Проверка `POST /v1/chat/completions` (JSON и SSE)
 
-В v0.6.2 работают оба режима — при наличии `auth.json` для DeepSeek или
+В v0.6.3 работают оба режима — при наличии `auth.json` для DeepSeek или
 настроенного Google-провайдера (иначе `401`).
 
 Non-streaming (`stream: false`):
@@ -367,7 +372,8 @@ pnpm e2e:tools -- --verbose
      не проверяет, аутентификация встроена в сессию DeepSeek);
    - **Model** — `deepseek-web-chat`; при необходимости добавьте
      `deepseek-web-reasoner`, `google-gemini-api-flash`,
-     `google-gemini-api-pro` или `google-gemini-web`.
+     `google-gemini-api-pro`, `google-gemini-web`,
+     `google-gemini-web-flash` или `google-gemini-web-pro`.
 3. Нажмите **Fetch available models**, чтобы DSH обратился к
    `GET /v1/models`, либо добавьте модель вручную.
 4. Сохраните провайдера и выберите `deepseek-web-chat` для сессии.
@@ -389,6 +395,8 @@ llm-pi-ai:
         # - google-gemini-api-flash
         # - google-gemini-api-pro
         # - google-gemini-web
+        # - google-gemini-web-flash
+        # - google-gemini-web-pro
 ```
 
 `apiKeyEnv` указывает на переменную окружения, из которой DSH берёт
@@ -438,7 +446,7 @@ llm-pi-ai:
 
 ### 6.3. Что смотреть в логах
 
-- старт сервера: `AI DSH Bridge v0.6.2 listening on ...`;
+- старт сервера: `AI DSH Bridge v0.6.3 listening on ...`;
 - `requestId` запроса и модель;
 - статус upstream-ответа и длительность PoW (ориентир 100–500 мс);
 - число распознанных `tool_calls` и `finish_reason`;
@@ -553,7 +561,7 @@ pnpm dev
 
 Все команды — из `package.json`; других CLI-флагов проект не вводит.
 
-| Команда | Что делает | Статус в v0.6.2 |
+| Команда | Что делает | Статус в v0.6.3 |
 |---|---|---|
 | `pnpm dev` | Запуск с `tsx watch --env-file-if-exists=.env` | ✅ |
 | `pnpm build` | Сборка TypeScript (`tsc -p tsconfig.build.json`) | ✅ |

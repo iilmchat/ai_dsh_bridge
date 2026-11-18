@@ -440,13 +440,24 @@ export const registerCompletionsRoute = async (
     } else {
       // Google: L2 общий (DSML-инструкция в промпте), отличается транспорт
       // и авторизация (API-ключ или cookie-сессия gemini.google.com).
-      if (extractImageUrls(body.messages).length > 0) {
+      const imageUrls = extractImageUrls(body.messages);
+      if (imageUrls.length > 0 && providerModel.provider !== 'google-gemini-api') {
         return sendError(
           reply,
           400,
           'invalid_request_error',
-          `Модель ${body.model} пока не поддерживает изображения (KI-1018)`,
+          `Модель ${body.model} (веб-чат Gemini) пока не поддерживает изображения (KI-1018). Используйте google-gemini-api-flash/pro.`,
         );
+      }
+
+      let images: UploadFileInput[] = [];
+      if (imageUrls.length > 0) {
+        try {
+          images = await loadImagesAsync(body.messages);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          return sendError(reply, 400, 'invalid_request_error', message);
+        }
       }
 
       let promptParts: ReturnType<typeof buildPromptParts>;
@@ -466,6 +477,14 @@ export const registerCompletionsRoute = async (
           upstreamModel: providerModel.upstreamModel,
           system: promptParts.system,
           conversation: promptParts.conversation,
+          ...(images.length === 0
+            ? {}
+            : {
+                images: images.map((image) => ({
+                  mimeType: image.mimeType,
+                  data: Buffer.from(image.data).toString('base64'),
+                })),
+              }),
           ...(body.temperature === undefined ? {} : { temperature: body.temperature }),
           ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
         });

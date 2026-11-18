@@ -13,7 +13,7 @@ import { registerModelsRoute } from './api/models.js';
 import { loadConfig, type BridgeConfig } from './config.js';
 
 /** Версия каркаса; синхронизируется с `package.json` вручную. */
-const APP_VERSION = '0.6.2';
+const APP_VERSION = '0.6.3';
 
 /** Ответ `GET /health`. */
 interface HealthResponse {

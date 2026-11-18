@@ -32,6 +32,8 @@ export type GeminiE2EMode = 'web' | 'api';
 /** Зависимости e2e-скрипта; все опциональны и подменяются в unit-тестах. */
 export interface GeminiE2EDependencies {
   readonly mode?: GeminiE2EMode;
+  /** Upstream-модель (по умолчанию `gemini-web` или `gemini-2.5-flash`). */
+  readonly upstreamModel?: string;
   readonly loadAuth?: () => Promise<GoogleAuth>;
   readonly resolveToken?: (auth: GoogleAuth) => Promise<string>;
   readonly webProvider?: () => ChatProvider;
@@ -128,7 +130,8 @@ export const runGeminiE2EAsync = async (
     }
 
     const result: ProviderCompletionResult = await provider.completeAsync({
-      upstreamModel: mode === 'api' ? 'gemini-2.5-flash' : 'gemini-web',
+      upstreamModel:
+        dependencies.upstreamModel ?? (mode === 'api' ? 'gemini-2.5-flash' : 'gemini-web'),
       system: '',
       conversation: PROMPT,
     });
@@ -157,8 +160,13 @@ const isDirectExecution = (): boolean => {
 
 if (isDirectExecution()) {
   const mode: GeminiE2EMode = process.argv.includes('--api') ? 'api' : 'web';
+  const modelIndex = process.argv.indexOf('--model');
+  const upstreamModel = modelIndex >= 0 ? process.argv[modelIndex + 1] : undefined;
   try {
-    const result = await runGeminiE2EAsync({ mode });
+    const result = await runGeminiE2EAsync({
+      mode,
+      ...(upstreamModel === undefined ? {} : { upstreamModel }),
+    });
     process.stdout.write(`\n[e2e:gemini] лог: ${result.logPath}\n`);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

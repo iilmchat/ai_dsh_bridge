@@ -26,6 +26,8 @@ describe('model registry', () => {
       'google-gemini-api-flash',
       'google-gemini-api-pro',
       'google-gemini-web',
+      'google-gemini-web-flash',
+      'google-gemini-web-pro',
     ]);
   });
 
@@ -45,6 +47,14 @@ describe('model registry', () => {
     expect(resolveProviderModel('google-gemini-web')).toMatchObject({
       provider: 'google-gemini-web',
       upstreamModel: 'gemini-web',
+    });
+    expect(resolveProviderModel('google-gemini-web-flash')).toMatchObject({
+      provider: 'google-gemini-web',
+      upstreamModel: 'gemini-2.5-flash',
+    });
+    expect(resolveProviderModel('google-gemini-web-pro')).toMatchObject({
+      provider: 'google-gemini-web',
+      upstreamModel: 'gemini-2.5-pro',
     });
   });
 
@@ -67,6 +77,8 @@ describe('GET /v1/models', () => {
       'google-gemini-api-flash',
       'google-gemini-api-pro',
       'google-gemini-web',
+      'google-gemini-web-flash',
+      'google-gemini-web-pro',
     ]);
     for (const model of body.data) {
       expect(model.object).toBe('model');

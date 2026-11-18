@@ -1,6 +1,6 @@
 # Roadmap AI DSH Bridge
 
-**Версия:** 0.6.2 · **Дата:** 2026-11-18 · **Статус:** актуален
+**Версия:** 0.6.3 · **Дата:** 2026-11-18 · **Статус:** актуален
 **Связанные документы:** [DESIGN.md](DESIGN.md), [DESIGN_GOOGLE.md](DESIGN_GOOGLE.md),
 [DESIGN_V06_VISION.md](DESIGN_V06_VISION.md),
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (Backlog, KI-1001…KI-1022).
@@ -26,6 +26,7 @@
 |---|---|---|---|---|
 | v0.6.0 | Vision & Multimodal | 🔴 Critical для агента | Done (S1–S3; S4 — Deferred, R-06-04 — Won't Fix) | R-06-01…R-06-04 |
 | v0.6.2 | Google Provider | 🟠 High | Done (R-06-05…R-06-07; KI-1017…KI-1019 — Open) | R-06-05…R-06-07 |
+| v0.6.3 | Google Expansion | 🟠 High | Done (R-06-08…R-06-10; KI-1017 Fixed, KI-1018 сужен, KI-1019 Open) | R-06-08…R-06-10 |
 | v0.7.0 | Performance & Reliability | 🟠 High | Planned | R-07-01…R-07-04 |
 | v0.8.0 | Ecosystem | 🟡 Medium | Planned | R-08-01…R-08-04 |
 | v0.9.0 | Advanced | 🟢 Low | Deferred | R-09-01…R-09-03 |
@@ -91,6 +92,26 @@ OpenAI-формате, `pnpm typecheck/lint/test/build` зелёные (168 те
 
 ---
 
+## v0.6.3 — Google Expansion (🟠 High)
+
+**Зачем.** После живой проверки веб-провайдера (0.6.3) расширить Google:
+дать API изображения и добавить выбор модели в веб-чате.
+
+| ID | Фича | Приоритет | Статус | Описание |
+|---|---|---|---|---|
+| R-06-08 | Изображения в Gemini API | 🟠 High | Done 2026-11-18 | `image_url` (`data:base64`/http) → `inlineData` (`mimeType` + base64) в `contents[].parts[]` рядом с текстом; лимит 10 МиБ; KI-1018 закрыт для API, веб-часть открыта. |
+| R-06-09 | Выбор модели Gemini Web | 🟡 Medium | Done 2026-11-18 | Модели `google-gemini-web-flash`/`-pro`; заголовок `x-goog-ext-525001261-jspb` подставляется по `upstreamModel`; живой e2e подтвердил flash (8.7 с) и pro (15.0 с). |
+| R-06-10 | Лимит заголовков Google + живой e2e | 🟠 High | Done 2026-11-18 | Google отдаёт ~30 КБ заголовков: `fetch` падал `HeadersOverflowError`, `webauth:google` не сохранял сессию. Переход на `undici.Client` (512 КБ), 3xx → 401; `pnpm e2e:gemini` подтвердил `StreamGenerate` (KI-1017 → Fixed). |
+
+**Критерии готовности (выполнены):** `pnpm e2e:gemini` (web/flash/pro) →
+`[4] E2E OK`; изображение уходит в Gemini API как `inlineData`; 176 тестов,
+`typecheck/lint/test/build` зелёные.
+
+**Риски:** заголовки моделей Google могут смениться (KI-1019); изображения в
+веб-чате не поддержаны (KI-1018); лимиты аккаунта Google.
+
+---
+
 ## v0.7.0 — Performance & Reliability (🟠 High)
 
 **Зачем.** Сквозной цикл работает, но PoW добавляет ~500 мс, а SSE
@@ -147,6 +168,8 @@ v0.6.0: R-06-01 (OCR) + R-06-03 (ref_file_ids) ──> Done
         R-06-02 (LLaVA) — Deferred, R-06-04 (screenshot tool) — Won't Fix
 v0.6.2: R-06-07 (реестр/контракт провайдеров) → R-06-05 (Gemini API);
         R-06-06 (Gemini Web) зависит от веб-протокола Google (KI-1017/1019).
+v0.6.3: R-06-10 (лимит заголовков) разблокировал живую проверку R-06-06;
+        R-06-08 (изображения API) и R-06-09 (flash/pro) — после неё.
 v0.7.0: R-07-01 (PoW) независим; R-07-02 (streaming) зависит от
         текущего DSML-парсера и SSE-writer; R-07-03 — от клиента DeepSeek.
 v0.8.0: R-08-01/02 — упаковка; R-08-03 — prompt/модель; R-08-04 — метрики.

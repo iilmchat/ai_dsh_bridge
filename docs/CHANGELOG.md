@@ -14,15 +14,38 @@
 
 ### Added
 
+### Changed
+
+### Fixed
+
+---
+
+## [0.6.3] — 2026-11-18
+
+### Added
+
+- **Изображения для Gemini API**: `image_url` (`data:base64` и http(s))
+  из `content` передаются в `:generateContent` как `inlineData`
+  (`mimeType` + base64) рядом с текстом. Лимит 10 МиБ и ошибки входного
+  изображения — как у DeepSeek. Gemini Web изображения по-прежнему не
+  принимает (KI-1018).
+- **Выбор модели Gemini Web**: `google-gemini-web-flash` и
+  `google-gemini-web-pro`; заголовок `x-goog-ext-525001261-jspb`
+  подставляется по `upstreamModel` (`GEMINI_WEB_MODEL_HEADERS`).
+  `google-gemini-web` остаётся моделью по умолчанию.
 - `pnpm e2e:gemini` — живой e2e Google-провайдеров: `web` (нужен
-  `pnpm webauth:google`) и `--api` (нужен `GEMINI_API_KEY`); проверяет
-  сессию, `SNlM0e`, `completeAsync` и пишет лог в
+  `pnpm webauth:google`), `--api` (нужен `GEMINI_API_KEY`),
+  `--model <upstreamModel>` для проверки flash/pro; лог в
   `docs/captures/e2e-gemini-*.log` без секретов.
+- `ProviderCompletionRequest.images` — провайдеры получают изображения
+  явно (Gemini API использует, остальные игнорируют).
 
 ### Changed
 
 - `docs/DESIGN_GOOGLE.md`: живая проверка веб-провайдера пройдена
-  (KI-1017 → Fixed), зафиксирован лимит заголовков Google.
+  (KI-1017 → Fixed), зафиксированы лимит заголовков Google, `inlineData`
+  и заголовки выбора модели.
+- `GET /v1/models` отдаёт 7 моделей (DeepSeek 2, Gemini API 2, Gemini Web 3).
 
 ### Fixed
 
@@ -33,10 +56,6 @@
   с `maxHeaderSize` 512 КБ; ответ 3xx трактуется как истёкшая сессия (401).
 - `scripts/e2e-gemini.ts`: ошибки провайдера логируются и пробрасываются с
   сохранением лога.
-
-- `GET /health` отдавал `version: "0.6.0-alpha"`: `APP_VERSION` в
-  `src/index.ts` не был синхронизирован с `package.json` при релизе 0.6.1
-  (RELEASES § 4). Теперь `/health` возвращает `0.6.1`.
 
 ---
 

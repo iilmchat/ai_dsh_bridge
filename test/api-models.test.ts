@@ -26,6 +26,8 @@ describe('GET /v1/models', () => {
       'google-gemini-api-flash',
       'google-gemini-api-pro',
       'google-gemini-web',
+      'google-gemini-web-flash',
+      'google-gemini-web-pro',
     ]);
     for (const model of body.data) {
       expect(model.object).toBe('model');

@@ -54,9 +54,14 @@ const GeminiResponseSchema = z.object({
     .optional(),
 });
 
+/** Часть запроса `:generateContent`: текст или изображение. */
+type GeminiRequestPart =
+  | { readonly text: string }
+  | { readonly inlineData: { readonly mimeType: string; readonly data: string } };
+
 /** Тело запроса `:generateContent`. */
 interface GeminiRequestBody {
-  readonly contents: readonly { readonly role: 'user'; readonly parts: readonly { readonly text: string }[] }[];
+  readonly contents: readonly { readonly role: 'user'; readonly parts: readonly GeminiRequestPart[] }[];
   readonly systemInstruction?: { readonly parts: readonly { readonly text: string }[] } | undefined;
   readonly generationConfig?:
     | {
@@ -149,7 +154,17 @@ export const createGeminiApiProvider = (options: GeminiApiProviderOptions): Chat
         : { maxOutputTokens: request.maxOutputTokens }),
     };
     const requestBody: GeminiRequestBody = {
-      contents: [{ role: 'user', parts: [{ text: request.conversation }] }],
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: request.conversation },
+            ...(request.images ?? []).map((image) => ({
+              inlineData: { mimeType: image.mimeType, data: image.data },
+            })),
+          ],
+        },
+      ],
       ...(request.system === ''
         ? {}
         : { systemInstruction: { parts: [{ text: request.system }] } }),

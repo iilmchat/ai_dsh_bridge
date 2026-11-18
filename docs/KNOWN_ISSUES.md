@@ -1,8 +1,8 @@
 # Известные проблемы AI DSH Bridge
 
-**Версия реестра:** 0.6.2
+**Версия реестра:** 0.6.3
 **Дата последнего обновления:** 2026-11-18
-**Статус проекта:** v0.6.2 (scaffold)
+**Статус проекта:** v0.6.3 (scaffold)
 
 Формат: `KI-XXX` — название, приоритет, статус, файлы.
 Приоритеты: 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low
@@ -332,19 +332,19 @@
 - **Проверка:** `pnpm webauth:google` → `pnpm e2e:gemini` → `[4] E2E OK`.
 - **Связанные:** KI-1019 (хрупкость протокола), DESIGN_GOOGLE § 5.
 
-### KI-1018 — Google-провайдеры не принимают изображения (Open)
+### KI-1018 — Gemini Web не принимает изображения (Open)
 - **Приоритет:** 🟡 Medium | **Статус:** Open | **Обнаружено:** 2026-11-18
 - **Файлы:** `src/api/completions.ts`, `src/google/gemini-api.ts`,
   `src/google/gemini-web.ts`
-- **Описание:** Запрос с `image_url` к любой Google-модели возвращает
-  `400 invalid_request_error` («пока не поддерживает изображения»). Причина:
-  у Gemini API не реализован `inlineData`, у веб-чата — загрузка файла.
-- **Влияние:** vision-сценарии доступны только через `deepseek-web-*`.
-- **План:** Gemini API — `contents[].parts[].inlineData` (`mimeType`,
-  `data`); Gemini Web — загрузка через `content-push.googleapis.com/upload`
-  и `fileData` в промпте. Оба пути покрыть тестами.
-- **Обходной путь:** отправлять изображения в DeepSeek-модель.
-- **Связанные:** R-06-05/R-06-06 (ROADMAP), DESIGN_GOOGLE § 6.
+- **Описание:** Gemini API изображения получает с 0.6.3 (`inlineData`:
+  `mimeType` + base64). Веб-чат изображения не принимает: запрос с
+  `image_url` к `google-gemini-web*` возвращает `400 invalid_request_error`.
+- **Влияние:** vision-сценарии в веб-чате Gemini недоступны; API и DeepSeek
+  работают.
+- **План:** загрузка через `content-push.googleapis.com/upload` и
+  `fileData` в `StreamGenerate`; покрыть тестом с фикстурой ответа.
+- **Обходной путь:** `google-gemini-api-flash`/`-pro` или `deepseek-web-*`.
+- **Связанные:** R-06-06 (ROADMAP), DESIGN_GOOGLE § 6.
 
 ### KI-1019 — Веб-протокол Gemini может измениться без предупреждения (Open)
 - **Приоритет:** 🟡 Medium | **Статус:** Open | **Обнаружено:** 2026-11-18
@@ -505,6 +505,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.6.0-alpha | 2026-10-20 | S1/S2 Vision: few-shot скриншота через PowerShell и OCR через `tesseract` (полный путь + `where tesseract`); fallback показывает последний tool-результат; 123 теста |
 | 0.6.1 | 2026-10-20 | S3: изображения через `upload_file` + `ref_file_ids`; KI-1003 → Fixed; добавлен KI-1016 (SSRF `image_url`); 136 тестов |
 | 0.6.2 | 2026-11-18 | Google-провайдеры: Gemini API и Gemini Web, реестр моделей, `webauth:google`; добавлены KI-1017…KI-1019; backlog KI-1020…KI-1022; 168 тестов |
+| 0.6.3 | 2026-11-18 | Gemini API: изображения (`inlineData`); Gemini Web: модели flash/pro; `e2e:gemini`; KI-1017 → Fixed, KI-1018 сужен до веб-чата; backlog KI-1023…KI-1025; 176 тестов |
 
 ---
 
@@ -535,6 +536,9 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | KI-1020 | R-06-05 | 🟠 High | Done | Gemini API (официальный, по ключу): `google-gemini-api-flash`/`-pro`, `:generateContent`, 0.6.2 |
 | KI-1021 | R-06-06 | 🟠 High | Done | Gemini Web (веб-чат `gemini.google.com`): `google-gemini-web`, `StreamGenerate`, `webauth:google`, 0.6.2 |
 | KI-1022 | R-06-07 | 🟡 Medium | Done | Слой провайдеров: `ChatProvider`, реестр `PROVIDER_MODELS`, роутинг моделей, 0.6.2 |
+| KI-1023 | R-06-08 | 🟠 High | Done | Изображения в Gemini API: `image_url` → `inlineData`, 0.6.3 |
+| KI-1024 | R-06-09 | 🟡 Medium | Done | Выбор модели Gemini Web: flash/pro через `x-goog-ext-525001261-jspb`, 0.6.3 |
+| KI-1025 | R-06-10 | 🟠 High | Done | Лимит заголовков Google: `undici.Client` 512 КБ, живая проверка `StreamGenerate`, 0.6.3 |
 
 ### KI-1003 — как закрыт (S3, 2026-10-20)
 

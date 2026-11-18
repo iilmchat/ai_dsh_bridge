@@ -58,6 +58,18 @@ export const PROVIDER_MODELS = [
     upstreamModel: 'gemini-web',
     displayName: 'Gemini Web Chat',
   },
+  {
+    id: 'google-gemini-web-flash',
+    provider: 'google-gemini-web',
+    upstreamModel: 'gemini-2.5-flash',
+    displayName: 'Gemini Web Chat (Flash)',
+  },
+  {
+    id: 'google-gemini-web-pro',
+    provider: 'google-gemini-web',
+    upstreamModel: 'gemini-2.5-pro',
+    displayName: 'Gemini Web Chat (Pro)',
+  },
 ] as const satisfies readonly ProviderModel[];
 
 /**

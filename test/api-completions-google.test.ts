@@ -35,6 +35,10 @@ const DSML_TEXT = `<｜DSML｜tool_calls>
   </｜DSML｜invoke>
 </｜DSML｜tool_calls>`;
 
+/** Минимальный PNG 1×1 в data:base64 (для vision-запросов). */
+const IMAGE_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
 /** Запрос к Google-модели. */
 const GOOGLE_PAYLOAD = {
   model: 'google-gemini-web',
@@ -105,6 +109,40 @@ describe('POST /v1/chat/completions — Google-провайдер', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json().error.message).toContain('Неизвестная модель');
     expect(response.json().error.message).toContain('google-gemini-web');
+  });
+
+  it('передаёт изображения провайдеру Gemini API', async () => {
+    const captured: { images: readonly { mimeType: string; data: string }[] | undefined }[] = [];
+    const provider: ChatProvider = {
+      id: 'google-gemini-api',
+      isConfiguredAsync: async () => true,
+      completeAsync: async (request) => {
+        captured.push({ images: request.images });
+        return { text: 'ok', usage: { promptTokens: 0, completionTokens: 0 } };
+      },
+    };
+    const app = await buildApp(provider);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/chat/completions',
+      payload: {
+        model: 'google-gemini-api-flash',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'что на картинке?' },
+              { type: 'image_url', image_url: { url: IMAGE_DATA_URL } },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(captured[0]?.images).toHaveLength(1);
+    expect(captured[0]?.images?.[0]?.mimeType).toBe('image/png');
+    expect((captured[0]?.images?.[0]?.data ?? '').length).toBeGreaterThan(0);
   });
 
   it('возвращает 400, если Google-модели передали изображение', async () => {

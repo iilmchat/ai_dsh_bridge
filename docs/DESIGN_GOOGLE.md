@@ -1,6 +1,6 @@
 # DESIGN — Google-провайдеры (Gemini API и Gemini Web)
 
-**Версия:** 1.0 · **Дата:** 2026-11-18 · **Статус:** реализовано в 0.6.2
+**Версия:** 1.1 · **Дата:** 2026-11-18 · **Статус:** реализовано в 0.6.2–0.6.3
 **Связанные документы:** [DESIGN.md](DESIGN.md), [ARCHITECTURE.md](ARCHITECTURE.md),
 [ROADMAP.md](ROADMAP.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md), [RULES.md](RULES.md).
 
@@ -69,7 +69,9 @@
 | `deepseek-web-reasoner` | `deepseek-web` | `reasoner` |
 | `google-gemini-api-flash` | `google-gemini-api` | `gemini-2.5-flash` |
 | `google-gemini-api-pro` | `google-gemini-api` | `gemini-2.5-pro` |
-| `google-gemini-web` | `google-gemini-web` | `gemini-web` |
+| `google-gemini-web` | `google-gemini-web` | `gemini-web` (модель Google по умолчанию) |
+| `google-gemini-web-flash` | `google-gemini-web` | `gemini-2.5-flash` |
+| `google-gemini-web-pro` | `google-gemini-web` | `gemini-2.5-pro` |
 
 `GET /v1/models` отдаёт все модели реестра (`owned_by` = `provider`,
 `capabilities.tools/function_calling/streaming = true`). Модель, отсутствующая
@@ -89,7 +91,13 @@
 ```json
 {
   "systemInstruction": { "parts": [{ "text": "<system + DSML>" }] },
-  "contents": [{ "role": "user", "parts": [{ "text": "<транскрипт>" }] }],
+  "contents": [{
+    "role": "user",
+    "parts": [
+      { "text": "<транскрипт>" },
+      { "inlineData": { "mimeType": "image/png", "data": "<base64>" } }
+    ]
+  }],
   "generationConfig": { "temperature": 0.2, "maxOutputTokens": 4096 }
 }
 ```
@@ -98,7 +106,8 @@
 (`exactOptionalPropertyTypes`, RULES § 4.7). В `contents` уходит один
 пользовательский ход: история уже размечена `[USER]`/`[ASSISTANT]`/
 `[TOOL_RESULT]`, поэтому отдельная конвертация ролей не нужна и поведение
-совпадает с DeepSeek.
+совпадает с DeepSeek. Изображения из `image_url` (`data:base64` и http(s))
+передаются как `inlineData` (0.6.3, KI-1018 для API закрыт).
 
 ### 4.2. Ответ
 
@@ -175,10 +184,14 @@ at=<SNlM0e>&f.req=<[null,"[[prompt],null,null]"]>
 длинный вариант. Код ошибки — `part[5][2][0][1][0]`.
 
 Протокол сверен с открытой реализацией `HanaokaYuzu/Gemini-API`
-(`v1.14.4`, файл `src/gemini_webapi/client.py`, метод `generate_content`).
-Опциональный заголовок модели (`x-goog-ext-525001261-jspb`) по умолчанию
-не отправляется — используется модель Google по умолчанию; при необходимости
-его можно передать через `modelHeader` фабрики.
+(`v1.14.4`, файл `src/gemini_webapi/client.py`, метод `generate_content`) и
+подтверждён живыми прогонами 2026-11-18: `google-gemini-web` — 15.6 с,
+`-flash` — 8.7 с, `-pro` — 15.0 с (все вернули `pong`).
+
+Выбор модели — заголовок `x-goog-ext-525001261-jspb` из
+`GEMINI_WEB_MODEL_HEADERS` (`gemini-2.5-flash`/`gemini-2.5-pro`); для
+`google-gemini-web` заголовок не отправляется (модель Google по умолчанию).
+Если Google сменит идентификаторы, upstream вернёт код 1052 (KI-1019).
 
 ### 5.3. Ошибки
 
@@ -195,11 +208,11 @@ at=<SNlM0e>&f.req=<[null,"[[prompt],null,null]"]>
 
 ## 6. Ограничения
 
-- **Изображения не поддерживаются** Google-провайдерами: `image_url` даёт
-  `400` с объяснением (KI-1018).
-- **Веб-протокол проверен живым прогоном** 2026-11-18 (`pong` за 15.6 с),
-  но остаётся неофициальным и может измениться без предупреждения
-  (KI-1019).
+- **Gemini Web не принимает изображения**: `image_url` к
+  `google-gemini-web*` даёт `400` с объяснением (KI-1018). Gemini API
+  изображения принимает (`inlineData`).
+- **Веб-протокол проверен живым прогоном** 2026-11-18 (web/flash/pro), но
+  остаётся неофициальным и может измениться без предупреждения (KI-1019).
 - **Только один аккаунт**: cookie-сессия одна, как и `auth.json` DeepSeek
   (мультиаккаунтность — R-07-04).
 - **Нет инкрементального streaming**: ответ собирается целиком, как и

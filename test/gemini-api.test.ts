@@ -134,6 +134,35 @@ describe('createGeminiApiProvider', () => {
     expect(result.usage).toEqual({ promptTokens: 7, completionTokens: 3 });
   });
 
+  it('прикладывает изображения как inlineData', async () => {
+    const requests: CapturedRequest[] = [];
+    const provider = createGeminiApiProvider({
+      apiKey: 'test-key',
+      fetchImpl: async (url, init) => {
+        requests.push({ url, init });
+        return jsonResponse({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] });
+      },
+    });
+
+    await provider.completeAsync({
+      upstreamModel: 'gemini-2.5-flash',
+      system: '',
+      conversation: 'что на картинке?',
+      images: [{ mimeType: 'image/png', data: 'QUJD' }],
+    });
+
+    const body = bodyOf(requestAt(requests));
+    expect(body['contents']).toEqual([
+      {
+        role: 'user',
+        parts: [
+          { text: 'что на картинке?' },
+          { inlineData: { mimeType: 'image/png', data: 'QUJD' } },
+        ],
+      },
+    ]);
+  });
+
   it('не отправляет systemInstruction и generationConfig, если они пусты', async () => {
     const requests: CapturedRequest[] = [];
     const provider = createGeminiApiProvider({
