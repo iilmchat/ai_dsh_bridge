@@ -71,11 +71,17 @@ export const googleRequestAsync: FetchAsync = async (url, init) => {
   const client = new Client(origin, { maxHeaderSize: MAX_HEADER_SIZE });
   try {
     const method = init.method === 'POST' ? 'POST' : 'GET';
+    const body =
+      typeof init.body === 'string'
+        ? init.body
+        : init.body instanceof Uint8Array
+          ? init.body
+          : undefined;
     const response = await client.request({
       method,
       path: `${pathname}${search}`,
       headers: toHeaderRecord(init.headers),
-      ...(typeof init.body === 'string' ? { body: init.body } : {}),
+      ...(body === undefined ? {} : { body }),
       ...(init.signal === undefined || init.signal === null ? {} : { signal: init.signal }),
     });
     const text = await response.body.text();

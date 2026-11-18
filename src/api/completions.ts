@@ -441,15 +441,6 @@ export const registerCompletionsRoute = async (
       // Google: L2 общий (DSML-инструкция в промпте), отличается транспорт
       // и авторизация (API-ключ или cookie-сессия gemini.google.com).
       const imageUrls = extractImageUrls(body.messages);
-      if (imageUrls.length > 0 && providerModel.provider !== 'google-gemini-api') {
-        return sendError(
-          reply,
-          400,
-          'invalid_request_error',
-          `Модель ${body.model} (веб-чат Gemini) пока не поддерживает изображения (KI-1018). Используйте google-gemini-api-flash/pro.`,
-        );
-      }
-
       let images: UploadFileInput[] = [];
       if (imageUrls.length > 0) {
         try {

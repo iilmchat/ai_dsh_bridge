@@ -12,6 +12,7 @@
  * Инструменты, как и у DeepSeek, эмулируются DSML-инструкцией в промпте —
  * отдельный реконструктор не нужен (ARCHITECTURE § 8.1).
  */
+import { randomUUID } from 'node:crypto';
 import type { GoogleAuth } from './auth.js';
 import { cookieHeaderValue, loadGoogleAuthAsync } from './auth.js';
 import { combineSignals, errorMessage, googleRequestAsync, isAbortError, type FetchAsync, type HttpResponseLike } from './http.js';
@@ -31,6 +32,15 @@ const GENERATE_PATH = '/_/BardChatUi/data/assistant.lamda.BardFrontendService/St
 
 /** Страница, из HTML которой берётся access token `SNlM0e`. */
 const APP_PATH = '/app';
+
+/** Эндпоинт загрузки файлов Google (content-push). */
+const UPLOAD_URL = 'https://content-push.googleapis.com/upload';
+
+/** `Push-ID` для загрузки (как в веб-клиенте Gemini). */
+const UPLOAD_PUSH_ID = 'feeds/mcudyrk2a4khkz';
+
+/** Tenant для загрузки файлов Gemini. */
+const UPLOAD_TENANT_ID = 'bard-storage';
 
 /** Таймаут запроса по умолчанию: веб-чат отвечает дольше API. */
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -172,20 +182,142 @@ export const resolveAccessTokenAsync = async (
   return token;
 };
 
+/** Файл, загруженный в Gemini и готовый к упоминанию в `f.req`. */
+export interface GeminiWebFile {
+  /** Идентификатор `/contrib_service/...`. */
+  readonly id: string;
+  /** Имя файла (передаётся рядом с id). */
+  readonly name: string;
+}
+
+/** Файл для загрузки в Gemini (изображение из `image_url`). */
+export interface GeminiWebUploadInput {
+  readonly data: Uint8Array;
+  readonly mimeType: string;
+  readonly fileName: string;
+}
+
 /**
  * Собирает тело POST-запроса `StreamGenerate`.
  *
  * Протокол: `at` — access token, `f.req` — JSON `[null, "<inner>"]`, где
- * `inner` — JSON `[[prompt], null, null]` (новый диалог без metadata).
+ * `inner` — JSON `[messageContent, null, null]`. Без файлов
+ * `messageContent = [prompt]`; с файлами — `[prompt, 0, null, files]`,
+ * где `files = [[[id], имя], ...]` (формат `gemini_webapi`).
  *
  * @param prompt Полный prompt (системная инструкция + транскрипт).
  * @param accessToken Значение `SNlM0e`.
+ * @param files Загруженные файлы (изображения).
  * @returns URL-кодированная строка формы.
  */
-export const buildGenerateRequestBody = (prompt: string, accessToken: string): string => {
-  const inner = JSON.stringify([[prompt], null, null]);
+export const buildGenerateRequestBody = (
+  prompt: string,
+  accessToken: string,
+  files: readonly GeminiWebFile[] = [],
+): string => {
+  const messageContent =
+    files.length === 0
+      ? [prompt]
+      : [prompt, 0, null, files.map((file) => [[file.id], file.name])];
+  const inner = JSON.stringify([messageContent, null, null]);
   const fReq = JSON.stringify([null, inner]);
   return new URLSearchParams({ at: accessToken, 'f.req': fReq }).toString();
+};
+
+/**
+ * Определяет расширение файла по MIME-типу.
+ * @param mimeType MIME-тип изображения.
+ */
+const extensionForMimeType = (mimeType: string): string => {
+  const subtype = mimeType.toLowerCase().split('/')[1] ?? 'png';
+  const normalized = subtype === 'jpeg' ? 'jpg' : subtype === 'svg+xml' ? 'svg' : subtype;
+  const safe = normalized.replaceAll(/[^a-z0-9]/gu, '');
+  return safe === '' ? 'png' : safe;
+};
+
+/**
+ * Формирует имя файла для multipart по индексу и MIME-типу.
+ * @param index Индекс изображения.
+ * @param mimeType MIME-тип.
+ */
+const imageFileName = (index: number, mimeType: string): string =>
+  `image-${String(index + 1)}.${extensionForMimeType(mimeType)}`;
+
+/**
+ * Собирает multipart-тело с единственным полем `file`.
+ * @param file Данные файла.
+ * @param boundary Граница multipart.
+ */
+const buildMultipartBody = (file: GeminiWebUploadInput, boundary: string): Uint8Array => {
+  const header = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.fileName}"\r\nContent-Type: ${file.mimeType}\r\n\r\n`,
+    'utf8',
+  );
+  const footer = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
+  return Buffer.concat([header, Buffer.from(file.data), footer]);
+};
+
+/**
+ * Загружает файл в Google (`content-push`) и возвращает id для `f.req`.
+ *
+ * Сверено с `gemini_webapi.utils.upload_file`: POST multipart с полем
+ * `file`, заголовки `Push-ID`/`X-Tenant-Id`, ответ — текстовый id.
+ *
+ * @param file Данные файла.
+ * @param options HTTP-клиент, таймаут, сигнал отмены.
+ * @returns `id` и `name` для сообщения Generation.
+ * @throws ProviderRequestError если загрузка не удалась.
+ */
+export const uploadGeminiFileAsync = async (
+  file: GeminiWebUploadInput,
+  options: {
+    readonly fetchImpl?: FetchAsync | undefined;
+    readonly timeoutMs?: number | undefined;
+    readonly signal?: AbortSignal | undefined;
+  } = {},
+): Promise<GeminiWebFile> => {
+  const fetchImpl = options.fetchImpl ?? googleRequestAsync;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const boundary = `----ai-dsh-bridge-${randomUUID()}`;
+
+  let response: HttpResponseLike;
+  try {
+    response = await fetchImpl(UPLOAD_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+        'push-id': UPLOAD_PUSH_ID,
+        'x-tenant-id': UPLOAD_TENANT_ID,
+        origin: GEMINI_WEB_BASE_URL,
+        referer: `${GEMINI_WEB_BASE_URL}/`,
+      },
+      body: buildMultipartBody(file, boundary),
+      signal: combineSignals(options.signal, timeoutMs),
+    });
+  } catch (error: unknown) {
+    if (isAbortError(error)) {
+      throw new ProviderRequestError(
+        `Загрузка изображения в Gemini не завершилась за ${String(timeoutMs)} мс`,
+        504,
+      );
+    }
+    throw new ProviderRequestError(
+      `Не удалось загрузить изображение в Gemini: ${errorMessage(error)}`,
+      502,
+    );
+  }
+
+  const id = (await response.text()).trim();
+  if (!response.ok) {
+    throw new ProviderRequestError(
+      `Google отклонил загрузку изображения (HTTP ${String(response.status)})`,
+      response.status === 401 || response.status === 403 ? 401 : 502,
+    );
+  }
+  if (id === '') {
+    throw new ProviderRequestError('Gemini не вернул id загруженного изображения', 502);
+  }
+  return { id, name: file.fileName };
 };
 
 /**
@@ -368,6 +500,27 @@ export const createGeminiWebProvider = (options: GeminiWebProviderOptions): Chat
     const accessToken = await accessTokenAsync(auth, request.signal);
 
     const prompt = request.system === '' ? request.conversation : `${request.system}\n\n${request.conversation}`;
+
+    // Изображения сначала загружаются в Google, затем упоминаются в f.req.
+    const files: GeminiWebFile[] = [];
+    const images = request.images ?? [];
+    for (const [index, image] of images.entries()) {
+      files.push(
+        await uploadGeminiFileAsync(
+          {
+            data: Buffer.from(image.data, 'base64'),
+            mimeType: image.mimeType,
+            fileName: imageFileName(index, image.mimeType),
+          },
+          {
+            fetchImpl,
+            timeoutMs,
+            ...(request.signal === undefined ? {} : { signal: request.signal }),
+          },
+        ),
+      );
+    }
+
     const headers: Record<string, string> = {
       'content-type': 'application/x-www-form-urlencoded;charset=utf-8',
       origin: baseUrl,
@@ -391,7 +544,7 @@ export const createGeminiWebProvider = (options: GeminiWebProviderOptions): Chat
       response = await fetchImpl(`${baseUrl}${GENERATE_PATH}`, {
         method: 'POST',
         headers,
-        body: buildGenerateRequestBody(prompt, accessToken),
+        body: buildGenerateRequestBody(prompt, accessToken, files),
         signal: combineSignals(request.signal, timeoutMs),
       });
     } catch (error: unknown) {

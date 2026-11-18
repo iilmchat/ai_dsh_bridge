@@ -1,6 +1,6 @@
 # Roadmap AI DSH Bridge
 
-**Версия:** 0.6.3 · **Дата:** 2026-11-18 · **Статус:** актуален
+**Версия:** 0.6.4 · **Дата:** 2026-11-18 · **Статус:** актуален
 **Связанные документы:** [DESIGN.md](DESIGN.md), [DESIGN_GOOGLE.md](DESIGN_GOOGLE.md),
 [DESIGN_V06_VISION.md](DESIGN_V06_VISION.md),
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (Backlog, KI-1001…KI-1022).
@@ -27,6 +27,7 @@
 | v0.6.0 | Vision & Multimodal | 🔴 Critical для агента | Done (S1–S3; S4 — Deferred, R-06-04 — Won't Fix) | R-06-01…R-06-04 |
 | v0.6.2 | Google Provider | 🟠 High | Done (R-06-05…R-06-07; KI-1017…KI-1019 — Open) | R-06-05…R-06-07 |
 | v0.6.3 | Google Expansion | 🟠 High | Done (R-06-08…R-06-10; KI-1017 Fixed, KI-1018 сужен, KI-1019 Open) | R-06-08…R-06-10 |
+| v0.6.4 | Google Web Vision | 🟠 High | Done (R-06-11; KI-1018 Fixed) | R-06-11 |
 | v0.7.0 | Performance & Reliability | 🟠 High | Planned | R-07-01…R-07-04 |
 | v0.8.0 | Ecosystem | 🟡 Medium | Planned | R-08-01…R-08-04 |
 | v0.9.0 | Advanced | 🟢 Low | Deferred | R-09-01…R-09-03 |
@@ -112,6 +113,26 @@ OpenAI-формате, `pnpm typecheck/lint/test/build` зелёные (168 те
 
 ---
 
+## v0.6.4 — Google Web Vision (🟠 High)
+
+**Зачем.** Закрыть последний функциональный пробел Google: изображения в
+веб-чате `gemini.google.com`, чтобы DSH мог отправлять скриншоты и в
+Gemini Web, а не только в Gemini API/DeepSeek.
+
+| ID | Фича | Приоритет | Статус | Описание |
+|---|---|---|---|---|
+| R-06-11 | Изображения в Gemini Web | 🟠 High | Done 2026-11-18 | `image_url` → `content-push.googleapis.com/upload` (multipart, `Push-ID`, `X-Tenant-Id`) → `messageContent = [prompt, 0, null, [[[id], имя]]]` в `StreamGenerate`; `googleRequestAsync` отправляет бинарное тело. Живой прогон: красный квадрат → «Красный». KI-1018 → Fixed. |
+
+**Критерии готовности (выполнены):** картинка проходит путь
+`/v1/chat/completions` → upload → `StreamGenerate` → ответ модели; юнит-тесты
+проверяют multipart и `f.req`; 179 тестов, проверки зелёные.
+
+**Риски:** транзиентные `Connect Timeout` к `content-push.googleapis.com`
+(наблюдался один раз, повтор успешен — ретрай не реализован); лимиты
+аккаунта Google.
+
+---
+
 ## v0.7.0 — Performance & Reliability (🟠 High)
 
 **Зачем.** Сквозной цикл работает, но PoW добавляет ~500 мс, а SSE
@@ -170,6 +191,7 @@ v0.6.2: R-06-07 (реестр/контракт провайдеров) → R-06-
         R-06-06 (Gemini Web) зависит от веб-протокола Google (KI-1017/1019).
 v0.6.3: R-06-10 (лимит заголовков) разблокировал живую проверку R-06-06;
         R-06-08 (изображения API) и R-06-09 (flash/pro) — после неё.
+v0.6.4: R-06-11 (изображения Web) использует upload из R-06-06.
 v0.7.0: R-07-01 (PoW) независим; R-07-02 (streaming) зависит от
         текущего DSML-парсера и SSE-writer; R-07-03 — от клиента DeepSeek.
 v0.8.0: R-08-01/02 — упаковка; R-08-03 — prompt/модель; R-08-04 — метрики.

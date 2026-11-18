@@ -6,7 +6,7 @@
 один раз, а `tool_calls` эмулируются DSML-разметкой в prompt с корректным
 SSE-стримингом — без `UNKNOWN_TOOL`.
 
-> **Статус: v0.6.3 (scaffold).** Работают `GET /health`, `GET /v1/models`,
+> **Статус: v0.6.4 (scaffold).** Работают `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
 > `POST /v1/chat/completions` в обоих режимах — `stream: false` (JSON) и
 > `stream: true` (OpenAI SSE с `tool_calls`). Изображения из `content`
@@ -16,7 +16,8 @@ SSE-стримингом — без `UNKNOWN_TOOL`.
 > веб-чат **`gemini.google.com`** по cookie-сессии (`google-gemini-web`,
 > `pnpm webauth:google`). В 0.6.3 Gemini API принимает изображения
 > (`inlineData`), а веб-чат получил выбор модели (`-flash`/`-pro`);
-> веб-протокол подтверждён живым e2e. DSH подключается как Custom Provider;
+> в 0.6.4 изображения работают и в веб-чате (upload + `f.req`).
+> Веб-протокол подтверждён живым e2e. DSH подключается как Custom Provider;
 > сквозной tool-call цикл подтверждён живым e2e DSH (`bash` выполнен,
 > результат возвращён в модель) (см.
 > [DESIGN § 10](docs/DESIGN.md#10-этапы-реализации)
@@ -126,8 +127,9 @@ pnpm webauth:google
 `google-gemini-web-flash` или `google-gemini-web-pro`.
 
 > Веб-чат — неофициальный путь: протокол может измениться без предупреждения
-> (KI-1019), изображения в веб-чате не поддерживаются (KI-1018).
-> Использование веб-чата может нарушать условия Google — отдельный аккаунт.
+> (KI-1019). Изображения поддерживаются: загружаются в Google и передаются
+> модели (`content-push` + `f.req`). Использование веб-чата может нарушать
+> условия Google — отдельный аккаунт.
 
 ## Проверка
 
@@ -162,7 +164,8 @@ pnpm e2e:tools -- --prompt-only  # только prompt, без сети
 нативно через `upload_file` + `ref_file_ids` (LLaVA отложена, отдельная
 обёртка `screenshot` не нужна). v0.6.2 добавила Google-провайдеры (Gemini API
 и Gemini Web), v0.6.3 — изображения для Gemini API, модели
-`google-gemini-web-flash`/`-pro` и живой e2e веб-протокола; см.
+`google-gemini-web-flash`/`-pro` и живой e2e веб-протокола, v0.6.4 —
+изображения в Gemini Web (upload + `f.req`); см.
 [DESIGN_GOOGLE.md](docs/DESIGN_GOOGLE.md). Следующая —
 v0.7.0 Performance & Reliability (ускорение PoW, инкрементальный streaming,
 автовосстановление сессии), затем v0.8.0 Ecosystem (npm/Docker/reasoner/метрики)

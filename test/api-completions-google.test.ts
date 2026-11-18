@@ -145,8 +145,17 @@ describe('POST /v1/chat/completions — Google-провайдер', () => {
     expect((captured[0]?.images?.[0]?.data ?? '').length).toBeGreaterThan(0);
   });
 
-  it('возвращает 400, если Google-модели передали изображение', async () => {
-    const app = await buildApp(fakeProvider('ok'));
+  it('передаёт изображения веб-провайдеру Gemini', async () => {
+    const captured: { images: readonly { mimeType: string; data: string }[] | undefined }[] = [];
+    const provider: ChatProvider = {
+      id: 'google-gemini-web',
+      isConfiguredAsync: async () => true,
+      completeAsync: async (request) => {
+        captured.push({ images: request.images });
+        return { text: 'ok', usage: { promptTokens: 0, completionTokens: 0 } };
+      },
+    };
+    const app = await buildApp(provider);
     const response = await app.inject({
       method: 'POST',
       url: '/v1/chat/completions',
@@ -157,20 +166,16 @@ describe('POST /v1/chat/completions — Google-провайдер', () => {
             role: 'user',
             content: [
               { type: 'text', text: 'что на картинке?' },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-                },
-              },
+              { type: 'image_url', image_url: { url: IMAGE_DATA_URL } },
             ],
           },
         ],
       },
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(response.json().error.message).toContain('не поддерживает изображения');
+    expect(response.statusCode).toBe(200);
+    expect(captured[0]?.images).toHaveLength(1);
+    expect(captured[0]?.images?.[0]?.mimeType).toBe('image/png');
   });
 
   it('пробрасывает статус ошибки провайдера (503 → upstream_unavailable)', async () => {

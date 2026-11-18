@@ -1,6 +1,6 @@
 # DESIGN — Google-провайдеры (Gemini API и Gemini Web)
 
-**Версия:** 1.1 · **Дата:** 2026-11-18 · **Статус:** реализовано в 0.6.2–0.6.3
+**Версия:** 1.2 · **Дата:** 2026-11-18 · **Статус:** реализовано в 0.6.2–0.6.4
 **Связанные документы:** [DESIGN.md](DESIGN.md), [ARCHITECTURE.md](ARCHITECTURE.md),
 [ROADMAP.md](ROADMAP.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md), [RULES.md](RULES.md).
 
@@ -193,7 +193,34 @@ at=<SNlM0e>&f.req=<[null,"[[prompt],null,null]"]>
 `google-gemini-web` заголовок не отправляется (модель Google по умолчанию).
 Если Google сменит идентификаторы, upstream вернёт код 1052 (KI-1019).
 
-### 5.3. Ошибки
+### 5.3. Изображения
+
+Изображения из `image_url` (0.6.4) загружаются отдельно, до генерации:
+
+```
+POST https://content-push.googleapis.com/upload
+push-id: feeds/mcudyrk2a4khkz
+x-tenant-id: bard-storage
+origin/referer: https://gemini.google.com
+
+multipart/form-data; field "file"; filename="image-1.png"; Content-Type: image/png
+```
+
+Ответ — текстовый идентификатор
+`/contrib_service/ttl_1d/<id>`; он передаётся в `f.req`:
+
+```json
+[[["<prompt>", 0, null, [[["/contrib_service/ttl_1d/<id>"], "image-1.png"]]], null, null]]
+```
+
+Протокол сверен с `gemini_webapi.utils.upload_file` и подтверждён живым
+прогоном 2026-11-18: красный квадрат 128×128 через
+`POST /v1/chat/completions` → `google-gemini-web` ответил «Красный».
+Ограничение — 10 МиБ на изображение (как у DeepSeek). Наблюдался один
+транзиентный `Connect Timeout` к `content-push.googleapis.com`; повторный
+запрос успешен, автоматического ретрая пока нет.
+
+### 5.4. Ошибки
 
 | Код/условие | Статус шлюза | План |
 |---|---|---|
@@ -208,11 +235,11 @@ at=<SNlM0e>&f.req=<[null,"[[prompt],null,null]"]>
 
 ## 6. Ограничения
 
-- **Gemini Web не принимает изображения**: `image_url` к
-  `google-gemini-web*` даёт `400` с объяснением (KI-1018). Gemini API
-  изображения принимает (`inlineData`).
-- **Веб-протокол проверен живым прогоном** 2026-11-18 (web/flash/pro), но
-  остаётся неофициальным и может измениться без предупреждения (KI-1019).
+- **Изображения поддерживаются обоими путями**: Gemini API — `inlineData`,
+  Gemini Web — upload в `content-push` + `f.req` (0.6.4). Лимит 10 МиБ.
+- **Веб-протокол проверен живым прогоном** 2026-11-18 (web/flash/pro и
+  изображение), но остаётся неофициальным и может измениться без
+  предупреждения (KI-1019).
 - **Только один аккаунт**: cookie-сессия одна, как и `auth.json` DeepSeek
   (мультиаккаунтность — R-07-04).
 - **Нет инкрементального streaming**: ответ собирается целиком, как и
@@ -246,10 +273,12 @@ pnpm e2e:gemini --api         # Gemini API: pong + usage
 # вариант Web
 pnpm webauth:google
 pnpm e2e:gemini               # Gemini Web: pong за ~15 с
+pnpm e2e:gemini --model gemini-2.5-flash
 ```
 
 `pnpm e2e:gemini` пишет лог в `docs/captures/e2e-gemini-*.log`
-(вне git), cookie и ключи в лог не попадают.
+(вне git), cookie и ключи в лог не попадают. Изображения проверены живым
+запросом через шлюз (красный квадрат → «Красный»).
 
 ---
 

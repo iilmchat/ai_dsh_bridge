@@ -1,8 +1,8 @@
 # Известные проблемы AI DSH Bridge
 
-**Версия реестра:** 0.6.3
+**Версия реестра:** 0.6.4
 **Дата последнего обновления:** 2026-11-18
-**Статус проекта:** v0.6.3 (scaffold)
+**Статус проекта:** v0.6.4 (scaffold)
 
 Формат: `KI-XXX` — название, приоритет, статус, файлы.
 Приоритеты: 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low
@@ -19,9 +19,9 @@
 
 | Статус | Количество | Записи |
 |---|---|---|
-| Open | 5 | KI-014, KI-015, KI-1016, KI-1018, KI-1019 |
+| Open | 4 | KI-014, KI-015, KI-1016, KI-1019 |
 | In Progress | 0 | — |
-| Fixed | 12 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-007, KI-008, KI-009, KI-011, KI-012, KI-016, KI-1017 |
+| Fixed | 13 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-007, KI-008, KI-009, KI-011, KI-012, KI-016, KI-1017, KI-1018 |
 | Documented | 1 | KI-001 |
 | Deferred | 1 | KI-010 |
 | Won't Fix | 1 | KI-013 |
@@ -32,7 +32,7 @@
 | Приоритет | Количество | Записи |
 |---|---|---|
 | 🔴 Critical | 1 | KI-005 |
-| 🟠 High | 6 | KI-002, KI-003, KI-004, KI-006, KI-007, KI-1016 |
+| 🟠 High | 7 | KI-002, KI-003, KI-004, KI-006, KI-007, KI-1016, KI-1017 |
 | 🟡 Medium | 9 | KI-008, KI-009, KI-011, KI-012, KI-013, KI-014, KI-016, KI-1018, KI-1019 |
 | 🟢 Low | 3 | KI-001, KI-010, KI-015 |
 | **Всего** | **20** | — |
@@ -332,19 +332,25 @@
 - **Проверка:** `pnpm webauth:google` → `pnpm e2e:gemini` → `[4] E2E OK`.
 - **Связанные:** KI-1019 (хрупкость протокола), DESIGN_GOOGLE § 5.
 
-### KI-1018 — Gemini Web не принимает изображения (Open)
-- **Приоритет:** 🟡 Medium | **Статус:** Open | **Обнаружено:** 2026-11-18
-- **Файлы:** `src/api/completions.ts`, `src/google/gemini-api.ts`,
-  `src/google/gemini-web.ts`
-- **Описание:** Gemini API изображения получает с 0.6.3 (`inlineData`:
-  `mimeType` + base64). Веб-чат изображения не принимает: запрос с
-  `image_url` к `google-gemini-web*` возвращает `400 invalid_request_error`.
-- **Влияние:** vision-сценарии в веб-чате Gemini недоступны; API и DeepSeek
-  работают.
-- **План:** загрузка через `content-push.googleapis.com/upload` и
-  `fileData` в `StreamGenerate`; покрыть тестом с фикстурой ответа.
-- **Обходной путь:** `google-gemini-api-flash`/`-pro` или `deepseek-web-*`.
-- **Связанные:** R-06-06 (ROADMAP), DESIGN_GOOGLE § 6.
+### KI-1018 — Gemini Web не принимает изображения (Fixed)
+- **Приоритет:** 🟡 Medium | **Статус:** Fixed | **Обнаружено:** 2026-11-18
+- **Исправлено в:** 0.6.4 (2026-11-18), живой прогон через шлюз
+- **Файлы:** `src/api/completions.ts`, `src/google/gemini-web.ts`,
+  `test/gemini-web.test.ts`
+- **Описание:** Gemini API изображения получал с 0.6.3 (`inlineData`), но
+  веб-чат изображения не принимал: `image_url` к `google-gemini-web*`
+  возвращал `400`.
+- **Исправление:** изображение загружается в
+  `content-push.googleapis.com/upload` (multipart, `Push-ID`,
+  `X-Tenant-Id`), затем передаётся в `StreamGenerate` как
+  `messageContent = [prompt, 0, null, [[[id], имя]]]`.
+- **Проверка:** красный квадрат 128×128 через
+  `POST /v1/chat/completions` → `google-gemini-web` ответил «Красный»;
+  юнит-тесты проверяют multipart и формат `f.req`.
+- **Замечание:** первый живой вызов завершился транзиентным
+  `Connect Timeout` к `content-push.googleapis.com` (10 с), повтор —
+  успешен; ретрай загрузки не реализован.
+- **Связанные:** R-06-11, DESIGN_GOOGLE § 5.3.
 
 ### KI-1019 — Веб-протокол Gemini может измениться без предупреждения (Open)
 - **Приоритет:** 🟡 Medium | **Статус:** Open | **Обнаружено:** 2026-11-18
@@ -506,6 +512,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.6.1 | 2026-10-20 | S3: изображения через `upload_file` + `ref_file_ids`; KI-1003 → Fixed; добавлен KI-1016 (SSRF `image_url`); 136 тестов |
 | 0.6.2 | 2026-11-18 | Google-провайдеры: Gemini API и Gemini Web, реестр моделей, `webauth:google`; добавлены KI-1017…KI-1019; backlog KI-1020…KI-1022; 168 тестов |
 | 0.6.3 | 2026-11-18 | Gemini API: изображения (`inlineData`); Gemini Web: модели flash/pro; `e2e:gemini`; KI-1017 → Fixed, KI-1018 сужен до веб-чата; backlog KI-1023…KI-1025; 176 тестов |
+| 0.6.4 | 2026-11-18 | Gemini Web: изображения (upload `content-push` + `f.req`); KI-1018 → Fixed; backlog KI-1026; 179 тестов |
 
 ---
 
@@ -539,6 +546,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | KI-1023 | R-06-08 | 🟠 High | Done | Изображения в Gemini API: `image_url` → `inlineData`, 0.6.3 |
 | KI-1024 | R-06-09 | 🟡 Medium | Done | Выбор модели Gemini Web: flash/pro через `x-goog-ext-525001261-jspb`, 0.6.3 |
 | KI-1025 | R-06-10 | 🟠 High | Done | Лимит заголовков Google: `undici.Client` 512 КБ, живая проверка `StreamGenerate`, 0.6.3 |
+| KI-1026 | R-06-11 | 🟠 High | Done | Изображения в Gemini Web: upload `content-push` + файлы в `f.req`, 0.6.4 |
 
 ### KI-1003 — как закрыт (S3, 2026-10-20)
 

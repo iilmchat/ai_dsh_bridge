@@ -105,16 +105,25 @@ const headersOf = (request: CapturedRequest): Record<string, string> => {
 };
 
 /**
+ * Разбирает `f.req` и возвращает внутренний массив.
+ * @param body Тело формы.
+ */
+const decodeInner = (body: string): unknown => {
+  const params = new URLSearchParams(body);
+  const fReq = params.get('f.req') ?? '';
+  const outer: unknown = JSON.parse(fReq);
+  const innerRaw = Array.isArray(outer) ? outer[1] : undefined;
+  return typeof innerRaw === 'string' ? (JSON.parse(innerRaw) as unknown) : undefined;
+};
+
+/**
  * Извлекает `at` и prompt из тела формы `StreamGenerate`.
  * @param body Тело запроса.
  */
 const decodeForm = (body: string): { readonly at: string; readonly prompt: string } => {
   const params = new URLSearchParams(body);
   const at = params.get('at') ?? '';
-  const fReq = params.get('f.req') ?? '';
-  const outer: unknown = JSON.parse(fReq);
-  const innerRaw = Array.isArray(outer) ? outer[1] : undefined;
-  const inner: unknown = typeof innerRaw === 'string' ? JSON.parse(innerRaw) : undefined;
+  const inner = decodeInner(body);
   const first = Array.isArray(inner) ? inner[0] : undefined;
   const prompt = Array.isArray(first) ? first[0] : undefined;
   return { at, prompt: typeof prompt === 'string' ? prompt : '' };
@@ -126,12 +135,16 @@ const decodeForm = (body: string): { readonly at: string; readonly prompt: strin
  * @param onGenerate Кадры ответа генерации.
  * @param appStatus HTTP-статус страницы `/app`.
  * @param loadAuth Загрузчик сессии (по умолчанию — валидная тестовая).
+ * @param onUpload Ответ эндпоинта загрузки (id файла).
+ * @param uploadStatus HTTP-статус загрузки.
  */
 const createProvider = (
   requests: CapturedRequest[],
   onGenerate: () => string,
   appStatus = 200,
   loadAuth: (authFile: string) => Promise<GoogleAuth> = async () => TEST_AUTH,
+  onUpload: () => string = () => '/contrib_service/ttl_1d/test-file',
+  uploadStatus = 200,
 ) =>
   createGeminiWebProvider({
     authFile: 'unused.json',
@@ -143,6 +156,9 @@ const createProvider = (
       if (init.method === 'GET') {
         return textResponse(APP_HTML, appStatus);
       }
+      if (url.includes('content-push.googleapis.com')) {
+        return textResponse(onUpload(), uploadStatus);
+      }
       return textResponse(onGenerate());
     },
   });
@@ -153,6 +169,17 @@ describe('buildGenerateRequestBody', () => {
     const decoded = decodeForm(body);
     expect(decoded.at).toBe('AT-TOKEN');
     expect(decoded.prompt).toBe('привет');
+  });
+
+  it('кодирует загруженные файлы в messageContent', () => {
+    const body = buildGenerateRequestBody('что на картинке?', 'AT-TOKEN', [
+      { id: '/contrib_service/ttl_1d/abc', name: 'image-1.png' },
+    ]);
+    expect(decodeInner(body)).toEqual([
+      ['что на картинке?', 0, null, [[['/contrib_service/ttl_1d/abc'], 'image-1.png']]],
+      null,
+      null,
+    ]);
   });
 });
 
@@ -197,6 +224,73 @@ describe('createGeminiWebProvider', () => {
     const form = decodeForm(rawBody);
     expect(form.at).toBe('AT-TOKEN');
     expect(form.prompt).toBe('СИСТЕМА\n\n[USER]\nпривет');
+  });
+
+  it('загружает изображение и передаёт файл в f.req', async () => {
+    const requests: CapturedRequest[] = [];
+    const provider = createProvider(requests, () => framesBody([candidateFrame('ok')]));
+
+    const result = await provider.completeAsync({
+      upstreamModel: 'gemini-web',
+      system: '',
+      conversation: 'что на картинке?',
+      images: [{ mimeType: 'image/png', data: Buffer.from([1, 2, 3]).toString('base64') }],
+    });
+    expect(result.text).toBe('ok');
+
+    const upload = requests.find((request) =>
+      request.url.includes('content-push.googleapis.com'),
+    );
+    if (upload === undefined) {
+      throw new Error('Загрузка изображения не выполнена');
+    }
+    const uploadHeaders = headersOf(upload);
+    expect(uploadHeaders['push-id']).toBe('feeds/mcudyrk2a4khkz');
+    expect(uploadHeaders['x-tenant-id']).toBe('bard-storage');
+    const uploadBody = upload.init.body;
+    if (!(uploadBody instanceof Uint8Array)) {
+      throw new Error('Тело загрузки не бинарное');
+    }
+    const uploadText = Buffer.from(uploadBody).toString('utf8');
+    expect(uploadText).toContain('name="file"');
+    expect(uploadText).toContain('filename="image-1.png"');
+    expect(uploadText).toContain('Content-Type: image/png');
+
+    const generate = requests.find((request) => request.url.includes('StreamGenerate'));
+    if (generate === undefined) {
+      throw new Error('Запрос генерации не отправлен');
+    }
+    const rawBody = generate.init.body;
+    if (typeof rawBody !== 'string') {
+      throw new Error('Тело генерации не строка');
+    }
+    expect(decodeInner(rawBody)).toEqual([
+      ['что на картинке?', 0, null, [[['/contrib_service/ttl_1d/test-file'], 'image-1.png']]],
+      null,
+      null,
+    ]);
+  });
+
+  it('возвращает 502, если Google отклонил загрузку изображения', async () => {
+    const requests: CapturedRequest[] = [];
+    const provider = createProvider(
+      requests,
+      () => framesBody([]),
+      200,
+      async () => TEST_AUTH,
+      () => '',
+      500,
+    );
+
+    const error = await providerErrorAsync(
+      provider.completeAsync({
+        upstreamModel: 'gemini-web',
+        system: '',
+        conversation: 'q',
+        images: [{ mimeType: 'image/png', data: 'QUJD' }],
+      }),
+    );
+    expect(error.status).toBe(502);
   });
 
   it('передаёт заголовок модели для flash и не передаёт для default', async () => {

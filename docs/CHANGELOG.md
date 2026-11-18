@@ -20,6 +20,32 @@
 
 ---
 
+## [0.6.4] — 2026-11-18
+
+### Added
+
+- **Изображения в Gemini Web**: `image_url` загружается в
+  `content-push.googleapis.com/upload` (multipart, `Push-ID`,
+  `X-Tenant-Id`) и передаётся в `StreamGenerate` как
+  `messageContent = [prompt, 0, null, [[[id], имя]]]`. Живой прогон:
+  красный квадрат → ответ «Красный». KI-1018 → Fixed.
+- `GeminiWebFile`/`uploadGeminiFileAsync`, `buildGenerateRequestBody`
+  принимает загруженные файлы; `googleRequestAsync` умеет отправлять
+  бинарное тело (multipart).
+
+### Changed
+
+- `GET /v1/models` и документация: Google-провайдеры поддерживают
+  изображения (Gemini API — `inlineData`, Gemini Web — upload + `f.req`).
+- `docs/DESIGN_GOOGLE.md`: протокол загрузки, формат файлов в `f.req`,
+  результаты живой проверки.
+
+### Fixed
+
+- KI-1018 (Gemini Web не принимал изображения) — закрыт.
+
+---
+
 ## [0.6.3] — 2026-11-18
 
 ### Added
