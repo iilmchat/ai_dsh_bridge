@@ -150,6 +150,7 @@ const createProvider = (
     authFile: 'unused.json',
     baseUrl: 'https://gemini.test',
     timeoutMs: 5_000,
+    uploadRetryDelayMs: 0,
     loadAuth,
     fetchImpl: async (url, init) => {
       requests.push({ url, init });
@@ -291,6 +292,71 @@ describe('createGeminiWebProvider', () => {
       }),
     );
     expect(error.status).toBe(502);
+  });
+
+  it('повторяет загрузку после транзиентной сетевой ошибки', async () => {
+    let uploadAttempts = 0;
+    const provider = createGeminiWebProvider({
+      authFile: 'unused.json',
+      baseUrl: 'https://gemini.test',
+      timeoutMs: 5_000,
+      uploadRetryDelayMs: 0,
+      loadAuth: async () => TEST_AUTH,
+      fetchImpl: async (url, init) => {
+        if (init.method === 'GET') {
+          return textResponse(APP_HTML);
+        }
+        if (url.includes('content-push.googleapis.com')) {
+          uploadAttempts += 1;
+          if (uploadAttempts === 1) {
+            throw new TypeError('fetch failed');
+          }
+          return textResponse('/contrib_service/ttl_1d/retry-ok');
+        }
+        return textResponse(framesBody([candidateFrame('ok')]));
+      },
+    });
+
+    const result = await provider.completeAsync({
+      upstreamModel: 'gemini-web',
+      system: '',
+      conversation: 'q',
+      images: [{ mimeType: 'image/png', data: 'QUJD' }],
+    });
+    expect(result.text).toBe('ok');
+    expect(uploadAttempts).toBe(2);
+  });
+
+  it('не повторяет загрузку при 401', async () => {
+    let uploadAttempts = 0;
+    const provider = createGeminiWebProvider({
+      authFile: 'unused.json',
+      baseUrl: 'https://gemini.test',
+      timeoutMs: 5_000,
+      uploadRetryDelayMs: 0,
+      loadAuth: async () => TEST_AUTH,
+      fetchImpl: async (url, init) => {
+        if (init.method === 'GET') {
+          return textResponse(APP_HTML);
+        }
+        if (url.includes('content-push.googleapis.com')) {
+          uploadAttempts += 1;
+          return textResponse('', 401);
+        }
+        return textResponse(framesBody([]));
+      },
+    });
+
+    const error = await providerErrorAsync(
+      provider.completeAsync({
+        upstreamModel: 'gemini-web',
+        system: '',
+        conversation: 'q',
+        images: [{ mimeType: 'image/png', data: 'QUJD' }],
+      }),
+    );
+    expect(error.status).toBe(401);
+    expect(uploadAttempts).toBe(1);
   });
 
   it('передаёт заголовок модели для flash и не передаёт для default', async () => {

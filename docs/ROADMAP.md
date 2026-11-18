@@ -1,6 +1,6 @@
 # Roadmap AI DSH Bridge
 
-**Версия:** 0.6.4 · **Дата:** 2026-11-18 · **Статус:** актуален
+**Версия:** 0.6.5 · **Дата:** 2026-11-18 · **Статус:** актуален
 **Связанные документы:** [DESIGN.md](DESIGN.md), [DESIGN_GOOGLE.md](DESIGN_GOOGLE.md),
 [DESIGN_V06_VISION.md](DESIGN_V06_VISION.md),
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md) (Backlog, KI-1001…KI-1022).

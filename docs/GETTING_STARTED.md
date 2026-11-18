@@ -1,10 +1,10 @@
 # AI DSH Bridge — руководство по началу работы
 
-**Версия:** 0.6.4 (scaffold)
+**Версия:** 0.6.5 (scaffold)
 **Дата:** 2026-11-18
 **Связанные документы:** [DESIGN.md](./DESIGN.md), [DESIGN_GOOGLE.md](./DESIGN_GOOGLE.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [RULES.md](./RULES.md), [KNOWN_ISSUES.md](./KNOWN_ISSUES.md)
 
-> **Что уже работает в v0.6.4.** `GET /health`, `GET /v1/models`,
+> **Что уже работает в v0.6.5.** `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, `pnpm webauth:google`, клиент DeepSeek с PoW, Prompt
 > Builder, DSML-парсер и `POST /v1/chat/completions` в обоих режимах:
 > `stream: false` (JSON) и `stream: true` (OpenAI SSE с `tool_calls`).
@@ -15,7 +15,7 @@
 
 ## 0. Матрица готовности шагов
 
-| Шаг руководства | Что проверяет | Статус в v0.6.4 |
+| Шаг руководства | Что проверяет | Статус в v0.6.5 |
 |---|---|---|
 | §1–2. Требования и установка | Node.js 22+, pnpm, зависимости | ✅ доступно |
 | §4. Запуск каркаса | `pnpm dev`, `/health`, `/v1/models` | ✅ доступно |
@@ -174,7 +174,7 @@ pnpm dev
 
 ```text
 {"level":30,"time":1760886000000,"pid":12345,"hostname":"dev","msg":"Server listening at http://127.0.0.1:3456"}
-{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.6.4 listening on http://127.0.0.1:3456"}
+{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.6.5 listening on http://127.0.0.1:3456"}
 ```
 
 Сервер слушает **только loopback** (`127.0.0.1`). Порт берётся из `PORT`
@@ -204,7 +204,7 @@ pnpm dev:kill
 pnpm run version
 ```
 
-Выводит текущую версию из `package.json` (например, `0.6.4`).
+Выводит текущую версию из `package.json` (например, `0.6.5`).
 Команда `pnpm version` зарезервирована самим pnpm (semver-bump), поэтому
 для вывода используется `pnpm run version`.
 
@@ -223,7 +223,7 @@ curl -s http://127.0.0.1:3456/health
 ```json
 {
   "status": "ok",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "uptime_sec": 12
 }
 ```
@@ -261,7 +261,7 @@ Google-модели видны в списке всегда: доступнос�
 
 ### 4.4. Проверка `POST /v1/chat/completions` (JSON и SSE)
 
-В v0.6.4 работают оба режима — при наличии `auth.json` для DeepSeek или
+В v0.6.5 работают оба режима — при наличии `auth.json` для DeepSeek или
 настроенного Google-провайдера (иначе `401`).
 
 Non-streaming (`stream: false`):
@@ -446,7 +446,7 @@ llm-pi-ai:
 
 ### 6.3. Что смотреть в логах
 
-- старт сервера: `AI DSH Bridge v0.6.4 listening on ...`;
+- старт сервера: `AI DSH Bridge v0.6.5 listening on ...`;
 - `requestId` запроса и модель;
 - статус upstream-ответа и длительность PoW (ориентир 100–500 мс);
 - число распознанных `tool_calls` и `finish_reason`;
@@ -561,7 +561,7 @@ pnpm dev
 
 Все команды — из `package.json`; других CLI-флагов проект не вводит.
 
-| Команда | Что делает | Статус в v0.6.4 |
+| Команда | Что делает | Статус в v0.6.5 |
 |---|---|---|
 | `pnpm dev` | Запуск с `tsx watch --env-file-if-exists=.env` | ✅ |
 | `pnpm build` | Сборка TypeScript (`tsc -p tsconfig.build.json`) | ✅ |

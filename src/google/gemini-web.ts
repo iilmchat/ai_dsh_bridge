@@ -42,6 +42,12 @@ const UPLOAD_PUSH_ID = 'feeds/mcudyrk2a4khkz';
 /** Tenant для загрузки файлов Gemini. */
 const UPLOAD_TENANT_ID = 'bard-storage';
 
+/** Сколько попыток делает загрузка изображения (1 + один ретрай). */
+const DEFAULT_UPLOAD_ATTEMPTS = 2;
+
+/** Пауза между попытками загрузки, мс. */
+const UPLOAD_RETRY_DELAY_MS = 500;
+
 /** Таймаут запроса по умолчанию: веб-чат отвечает дольше API. */
 const DEFAULT_TIMEOUT_MS = 180_000;
 
@@ -90,6 +96,10 @@ export interface GeminiWebProviderOptions {
   readonly modelHeaders?: Readonly<Record<string, string>> | undefined;
   /** Функция HTTP-запроса (по умолчанию `fetch`). */
   readonly fetchImpl?: FetchAsync | undefined;
+  /** Сколько попыток делает загрузка изображения (по умолчанию 2). */
+  readonly uploadAttempts?: number | undefined;
+  /** Пауза между попытками загрузки, мс (по умолчанию 500). */
+  readonly uploadRetryDelayMs?: number | undefined;
   /** Часы (для тестов TTL access token). */
   readonly now?: (() => number) | undefined;
   /** Загрузчик cookie-сессии (по умолчанию `loadGoogleAuthAsync`). */
@@ -258,23 +268,28 @@ const buildMultipartBody = (file: GeminiWebUploadInput, boundary: string): Uint8
 };
 
 /**
- * Загружает файл в Google (`content-push`) и возвращает id для `f.req`.
- *
- * Сверено с `gemini_webapi.utils.upload_file`: POST multipart с полем
- * `file`, заголовки `Push-ID`/`X-Tenant-Id`, ответ — текстовый id.
- *
+ * Пауза между попытками загрузки.
+ * @param milliseconds Длительность паузы.
+ */
+const sleepAsync = (milliseconds: number): Promise<void> =>
+  new Promise<void>((resolvePromise) => {
+    setTimeout(resolvePromise, milliseconds);
+  });
+
+/**
+ * Одна попытка загрузки файла в Google.
  * @param file Данные файла.
  * @param options HTTP-клиент, таймаут, сигнал отмены.
  * @returns `id` и `name` для сообщения Generation.
- * @throws ProviderRequestError если загрузка не удалась.
+ * @throws ProviderRequestError если попытка не удалась.
  */
-export const uploadGeminiFileAsync = async (
+const uploadOnceAsync = async (
   file: GeminiWebUploadInput,
   options: {
     readonly fetchImpl?: FetchAsync | undefined;
     readonly timeoutMs?: number | undefined;
     readonly signal?: AbortSignal | undefined;
-  } = {},
+  },
 ): Promise<GeminiWebFile> => {
   const fetchImpl = options.fetchImpl ?? googleRequestAsync;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -318,6 +333,57 @@ export const uploadGeminiFileAsync = async (
     throw new ProviderRequestError('Gemini не вернул id загруженного изображения', 502);
   }
   return { id, name: file.fileName };
+};
+
+/**
+ * Загружает файл в Google (`content-push`) и возвращает id для `f.req`.
+ *
+ * Сверено с `gemini_webapi.utils.upload_file`: POST multipart с полем
+ * `file`, заголовки `Push-ID`/`X-Tenant-Id`, ответ — текстовый id.
+ *
+ * Транзиентные сбои (`502`/`504`: connect timeout, обрыв) повторяются один
+ * раз с паузой: в живой проверке первый вызов падал по `Connect Timeout`, а
+ * повтор проходил. Ошибки авторизации/запроса (4xx) не повторяются.
+ *
+ * @param file Данные файла.
+ * @param options HTTP-клиент, таймаут, сигнал отмены, число попыток.
+ * @returns `id` и `name` для сообщения Generation.
+ * @throws ProviderRequestError если все попытки не удались.
+ */
+export const uploadGeminiFileAsync = async (
+  file: GeminiWebUploadInput,
+  options: {
+    readonly fetchImpl?: FetchAsync | undefined;
+    readonly timeoutMs?: number | undefined;
+    readonly signal?: AbortSignal | undefined;
+    readonly attempts?: number | undefined;
+    readonly retryDelayMs?: number | undefined;
+    readonly sleep?: ((milliseconds: number) => Promise<void>) | undefined;
+  } = {},
+): Promise<GeminiWebFile> => {
+  const attempts = Math.max(1, options.attempts ?? DEFAULT_UPLOAD_ATTEMPTS);
+  const retryDelayMs = options.retryDelayMs ?? UPLOAD_RETRY_DELAY_MS;
+  const sleep = options.sleep ?? sleepAsync;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  let attempt = 0;
+  while (true) {
+    attempt += 1;
+    try {
+      return await uploadOnceAsync(file, {
+        fetchImpl: options.fetchImpl,
+        timeoutMs,
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
+      });
+    } catch (error: unknown) {
+      const retryable =
+        error instanceof ProviderRequestError && (error.status === 502 || error.status === 504);
+      if (!retryable || attempt >= attempts) {
+        throw error;
+      }
+      await sleep(retryDelayMs);
+    }
+  }
 };
 
 /**
@@ -515,6 +581,10 @@ export const createGeminiWebProvider = (options: GeminiWebProviderOptions): Chat
           {
             fetchImpl,
             timeoutMs,
+            ...(options.uploadAttempts === undefined ? {} : { attempts: options.uploadAttempts }),
+            ...(options.uploadRetryDelayMs === undefined
+              ? {}
+              : { retryDelayMs: options.uploadRetryDelayMs }),
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           },
         ),

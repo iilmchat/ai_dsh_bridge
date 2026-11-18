@@ -6,7 +6,7 @@
 один раз, а `tool_calls` эмулируются DSML-разметкой в prompt с корректным
 SSE-стримингом — без `UNKNOWN_TOOL`.
 
-> **Статус: v0.6.4 (scaffold).** Работают `GET /health`, `GET /v1/models`,
+> **Статус: v0.6.5 (scaffold).** Работают `GET /health`, `GET /v1/models`,
 > `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
 > `POST /v1/chat/completions` в обоих режимах — `stream: false` (JSON) и
 > `stream: true` (OpenAI SSE с `tool_calls`). Изображения из `content`
@@ -165,8 +165,8 @@ pnpm e2e:tools -- --prompt-only  # только prompt, без сети
 обёртка `screenshot` не нужна). v0.6.2 добавила Google-провайдеры (Gemini API
 и Gemini Web), v0.6.3 — изображения для Gemini API, модели
 `google-gemini-web-flash`/`-pro` и живой e2e веб-протокола, v0.6.4 —
-изображения в Gemini Web (upload + `f.req`); см.
-[DESIGN_GOOGLE.md](docs/DESIGN_GOOGLE.md). Следующая —
+изображения в Gemini Web (upload + `f.req`), v0.6.5 — ретрай загрузки
+изображений; см. [DESIGN_GOOGLE.md](docs/DESIGN_GOOGLE.md). Следующая —
 v0.7.0 Performance & Reliability (ускорение PoW, инкрементальный streaming,
 автовосстановление сессии), затем v0.8.0 Ecosystem (npm/Docker/reasoner/метрики)
 и v0.9.0 Advanced (CDP-fallback и др.). Идеи продублированы в

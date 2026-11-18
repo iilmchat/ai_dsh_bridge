@@ -217,8 +217,9 @@ multipart/form-data; field "file"; filename="image-1.png"; Content-Type: image/p
 прогоном 2026-11-18: красный квадрат 128×128 через
 `POST /v1/chat/completions` → `google-gemini-web` ответил «Красный».
 Ограничение — 10 МиБ на изображение (как у DeepSeek). Наблюдался один
-транзиентный `Connect Timeout` к `content-push.googleapis.com`; повторный
-запрос успешен, автоматического ретрая пока нет.
+транзиентный `Connect Timeout` к `content-push.googleapis.com`; с 0.6.5
+загрузка делает до двух попыток с паузой 500 мс при `502`/`504`
+(KI-1027 → Fixed).
 
 ### 5.4. Ошибки
 
