@@ -14,6 +14,11 @@
 
 ### Added
 
+- `pnpm bench:pow [--iterations N]` — бенчмарк PoW на реальном challenge из
+  захвата 2026-10-19 (min/median/mean). Базовый замер 2026-11-18:
+  min 538 мс, median 592 мс, mean 686 мс (7 прогонов, difficulty 144k);
+  цель R-07-01 — <200 мс.
+
 ### Changed
 
 ### Fixed

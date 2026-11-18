@@ -81,7 +81,7 @@ Google-провайдеры (Gemini API и Gemini Web с изображения�
 | `src/translate/types.ts` | `OpenAiMessage`, `OpenAiToolCall`, `OpenAiTool`, `ChatCompletionRequest/Response` (L1/L2) |
 | `src/auth/webauth.ts` | Chrome CDP :9222, извлечение `ds_session_id`/`aws-waf-token`/Bearer, `auth.json` 0600, таймаут 5 мин |
 | `src/auth/webauth-google.ts` | Chrome CDP :9222, захват cookie `google.com` в `google-auth.json` 0600, проверка `/app`, таймаут 5 мин (0.6.2) |
-| `test/` | **181 тест** (pow, client, webauth, webauth-google, e2e-script, e2e-gemini-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream, api-completions-google, api-models, providers, gemini-api, gemini-web) |
+| `test/` | **184 теста** (pow, client, webauth, webauth-google, e2e-script, e2e-gemini-script, bench-pow-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream, api-completions-google, api-models, providers, gemini-api, gemini-web) |
 | `scripts/e2e-deepseek.ts` | Живой e2e (`pnpm e2e:deepseek`): сессия → PoW → SSE → сборка текста, лог в `docs/captures/` с `<REDACTED>` |
 | `scripts/e2e-tools.ts` | Диагностика DSML (`pnpm e2e:tools`): prompt+tools → DeepSeek → `parseDsml`; `--prompt-only`, лог `e2e-tools-*.log` |
 | `.oxlintrc.json` | Конфиг oxlint: правила из RULES § 1/§ 4, `any` и `floating-promises` запрещены (KI-008 Fixed) |
@@ -223,13 +223,13 @@ Gemini Web, KI-1018 — изображения в Gemini Web, KI-1027 — рет
 
 | Метрика | Значение | Источник |
 |---|---|---|
-| Backend-тесты | **181** | `test/*.test.ts` (…/api-completions, api-completions-google, api-models, providers, gemini-api, gemini-web, webauth-google, e2e-gemini-script) |
+| Backend-тесты | **184** | `test/*.test.ts` (…/api-completions, api-completions-google, api-models, providers, gemini-api, gemini-web, webauth-google, e2e-gemini-script, bench-pow-script) |
 | Open KI | **4** | `docs/KNOWN_ISSUES.md` |
 | Всего KI | 21 (4 Open, 14 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
 | Версия | 0.6.5 | `package.json`, `src/index.ts` |
 | Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
-| Покрытие тестами | 181 тест; живой e2e DSH подтверждён вручную, Gemini Web (web/flash/pro и изображение) — `[4] E2E OK` / «Красный» | — |
+| Покрытие тестами | 184 теста; живой e2e DSH подтверждён вручную, Gemini Web (web/flash/pro и изображение) — `[4] E2E OK` / «Красный»; PoW baseline median 592 мс (`pnpm bench:pow`) | — |
 
 Правило: если в ответе приводится метрика (число тестов, Open KI, версия),
 она должна совпадать с этим разделом. Расхождение — повод обновить

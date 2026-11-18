@@ -150,6 +150,12 @@ pnpm e2e:gemini        # Gemini Web (после pnpm webauth:google)
 pnpm e2e:gemini --api  # Gemini API (нужен GEMINI_API_KEY)
 ```
 
+Замер PoW-решателя (база для v0.7.0):
+
+```powershell
+pnpm bench:pow --iterations 7
+```
+
 Диагностика DSML (когда модель должна вызвать инструмент):
 
 ```powershell

@@ -569,6 +569,7 @@ pnpm dev
 | `pnpm webauth` | Одноразовый захват сессии DeepSeek | ✅ |
 | `pnpm webauth:google` | Одноразовый захват cookie-сессии Google (Gemini Web) | ✅ (0.6.2) |
 | `pnpm e2e:gemini` | Живой e2e Google: `web` (нужен `google-auth.json`) или `--api` (нужен `GEMINI_API_KEY`) | ✅ (0.6.3) |
+| `pnpm bench:pow` | Бенчмарк PoW-решателя на реальном challenge (`--iterations N`) | ✅ |
 | `pnpm typecheck` | Проверка типов без эмита | ✅ |
 | `pnpm lint` | oxlint с type-aware проверками | ✅ |
 | `pnpm test` | vitest (пока тестов нет — `--passWithNoTests`) | ✅ |
