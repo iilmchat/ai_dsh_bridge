@@ -97,27 +97,28 @@ DeepSeek проходит (`[8] E2E OK`), модель описывает заг
 полной сборки), автовосстановление сессии при 401, CDP-fallback транспорта,
 точный учёт prompt/completion-токенов (DeepSeek отдаёт только
 `accumulated_token_usage`), автоматический e2e-тест DSH (живой e2e
-подтверждён вручную), изображения для Google-провайдеров (KI-1018) и
-живая проверка веб-протокола Gemini (KI-1017). WAF-заголовки `x-hif-*` не
-нужны (KI-013 Won't Fix). Ссылки на этапы — в § 6.
+подтверждён вручную), изображения для Google-провайдеров (KI-1018).
+Живая проверка веб-протокола Gemini пройдена 2026-11-18 (`pong` за 15.6 с),
+KI-1017 → Fixed; WAF-заголовки `x-hif-*` не нужны (KI-013 Won't Fix).
+Ссылки на этапы — в § 6.
 
 ### 2.3. Состояние реестра проблем (актуально на 2026-11-18)
 
-Всего в реестре **20** записей: **6 Open**, 11 Fixed (KI-002 — SSE-роут,
+Всего в реестре **20** записей: **5 Open**, 12 Fixed (KI-002 — SSE-роут,
 KI-003 — webauth, KI-004 — клиент+PoW, KI-005 — слой трансляции,
 KI-006 — SSE-writer, KI-007 — живой DSH e2e, KI-008 — `.oxlintrc.json`,
 KI-009 — `.env`, KI-011 — `LICENSE`, KI-012 — `--env-file-if-exists`,
-KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documented
-(KI-001 — шаблон), 1 Deferred (KI-010), 1 Won't Fix (KI-013 — WAF не
-обязателен). Открытые: KI-014, KI-015, KI-1016, KI-1017, KI-1018, KI-1019.
-Полные описания и планы — [docs/KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+KI-016 — живой e2e подтвердил `chat_session/create`, KI-1017 — живой e2e
+Gemini Web), 1 Documented (KI-001 — шаблон), 1 Deferred (KI-010),
+1 Won't Fix (KI-013 — WAF не обязателен). Открытые: KI-014, KI-015,
+KI-1016, KI-1018, KI-1019. Полные описания и планы —
+[docs/KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 | KI | Приоритет | Суть |
 |---|---|---|
 | KI-014 | 🟡 Medium | PoW-решатель на JS ~570 мс (цель 100–500 мс) |
 | KI-015 | 🟢 Low | `webauth`: ветка подключения к уже запущенному Chrome не проверена вживую |
 | KI-1016 | 🟠 High | SSRF: http(s)-`image_url` скачивается без allowlist и запрета приватных IP |
-| KI-1017 | 🟠 High | Веб-протокол Gemini не проверен на живом аккаунте (тесты на синтетических кадрах) |
 | KI-1018 | 🟡 Medium | Google-провайдеры не принимают изображения (`image_url` → 400) |
 | KI-1019 | 🟡 Medium | Веб-протокол Gemini может измениться без предупреждения |
 
@@ -220,13 +221,13 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 
 | Метрика | Значение | Источник |
 |---|---|---|
-| Backend-тесты | **168** | `test/*.test.ts` (…/api-completions, api-completions-google, api-models, providers, gemini-api, gemini-web, webauth-google) |
-| Open KI | **6** | `docs/KNOWN_ISSUES.md` |
-| Всего KI | 20 (6 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
+| Backend-тесты | **172** | `test/*.test.ts` (…/api-completions, api-completions-google, api-models, providers, gemini-api, gemini-web, webauth-google, e2e-gemini-script) |
+| Open KI | **5** | `docs/KNOWN_ISSUES.md` |
+| Всего KI | 20 (5 Open, 12 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
 | Версия | 0.6.2 | `package.json`, `src/index.ts` |
 | Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
-| Покрытие тестами | 168 тестов; живой e2e DSH подтверждён вручную | — |
+| Покрытие тестами | 172 теста; живой e2e DSH подтверждён вручную, живой e2e Gemini Web — `[4] E2E OK` | — |
 
 Правило: если в ответе приводится метрика (число тестов, Open KI, версия),
 она должна совпадать с этим разделом. Расхождение — повод обновить

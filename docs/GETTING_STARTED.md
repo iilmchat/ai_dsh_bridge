@@ -560,6 +560,7 @@ pnpm dev
 | `pnpm start` | Запуск собранного `dist/index.js` (`--env-file-if-exists=.env`) | ✅ (после `pnpm build`) |
 | `pnpm webauth` | Одноразовый захват сессии DeepSeek | ✅ |
 | `pnpm webauth:google` | Одноразовый захват cookie-сессии Google (Gemini Web) | ✅ (0.6.2) |
+| `pnpm e2e:gemini` | Живой e2e Google: `web` (нужен `google-auth.json`) или `--api` (нужен `GEMINI_API_KEY`) | ✅ (0.6.3) |
 | `pnpm typecheck` | Проверка типов без эмита | ✅ |
 | `pnpm lint` | oxlint с type-aware проверками | ✅ |
 | `pnpm test` | vitest (пока тестов нет — `--passWithNoTests`) | ✅ |

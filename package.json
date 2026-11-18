@@ -17,6 +17,7 @@
     "webauth:google": "tsx --env-file-if-exists=.env src/auth/webauth-google.ts",
     "e2e:deepseek": "tsx --env-file-if-exists=.env scripts/e2e-deepseek.ts",
     "e2e:tools": "tsx --env-file-if-exists=.env scripts/e2e-tools.ts",
+    "e2e:gemini": "tsx --env-file-if-exists=.env scripts/e2e-gemini.ts",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "oxlint --type-aware src/ test/ scripts/",

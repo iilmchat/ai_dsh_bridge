@@ -14,9 +14,25 @@
 
 ### Added
 
+- `pnpm e2e:gemini` — живой e2e Google-провайдеров: `web` (нужен
+  `pnpm webauth:google`) и `--api` (нужен `GEMINI_API_KEY`); проверяет
+  сессию, `SNlM0e`, `completeAsync` и пишет лог в
+  `docs/captures/e2e-gemini-*.log` без секретов.
+
 ### Changed
 
+- `docs/DESIGN_GOOGLE.md`: живая проверка веб-провайдера пройдена
+  (KI-1017 → Fixed), зафиксирован лимит заголовков Google.
+
 ### Fixed
+
+- `google-gemini-web` и `pnpm webauth:google`: Google отдаёт ~30 КБ
+  заголовков (8 `Set-Cookie`), стандартный `fetch` падал с
+  `HeadersOverflowError`, поэтому `validateGoogleSessionAsync` молча не
+  проходил и сессия не сохранялась. Запросы переведены на `undici.Client`
+  с `maxHeaderSize` 512 КБ; ответ 3xx трактуется как истёкшая сессия (401).
+- `scripts/e2e-gemini.ts`: ошибки провайдера логируются и пробрасываются с
+  сохранением лога.
 
 - `GET /health` отдавал `version: "0.6.0-alpha"`: `APP_VERSION` в
   `src/index.ts` не был синхронизирован с `package.json` при релизе 0.6.1

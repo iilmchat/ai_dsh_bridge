@@ -136,6 +136,13 @@ pnpm e2e:deepseek
 сессию, PoW, `chat_session/create`, SSE-поток и сборку текста; лог
 сохраняется в `docs/captures/e2e-*.log` (локально, gitignored).
 
+Проверка Google-провайдеров:
+
+```powershell
+pnpm e2e:gemini        # Gemini Web (после pnpm webauth:google)
+pnpm e2e:gemini --api  # Gemini API (нужен GEMINI_API_KEY)
+```
+
 Диагностика DSML (когда модель должна вызвать инструмент):
 
 ```powershell

@@ -14,7 +14,7 @@
  */
 import type { GoogleAuth } from './auth.js';
 import { cookieHeaderValue, loadGoogleAuthAsync } from './auth.js';
-import { combineSignals, errorMessage, isAbortError, type FetchAsync } from './http.js';
+import { combineSignals, errorMessage, googleRequestAsync, isAbortError, type FetchAsync, type HttpResponseLike } from './http.js';
 import {
   ProviderRequestError,
   ZERO_USAGE,
@@ -103,15 +103,14 @@ export const resolveAccessTokenAsync = async (
     readonly signal?: AbortSignal | undefined;
   } = {},
 ): Promise<string> => {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? googleRequestAsync;
   const baseUrl = (options.baseUrl ?? GEMINI_WEB_BASE_URL).replace(/\/+$/u, '');
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  let response: Response;
+  let response: HttpResponseLike;
   try {
     response = await fetchImpl(`${baseUrl}${APP_PATH}`, {
       method: 'GET',
-      redirect: 'follow',
       headers: {
         cookie: cookieHeaderValue(auth.cookies),
         'user-agent': USER_AGENT,
@@ -132,6 +131,13 @@ export const resolveAccessTokenAsync = async (
   if (response.status === 401 || response.status === 403) {
     throw new ProviderRequestError(
       'Сессия Google недействительна. Запустите pnpm webauth:google.',
+      401,
+    );
+  }
+  // Google отвечает 3xx, если cookie не приняты (страница входа/consent).
+  if (response.status >= 300 && response.status < 400) {
+    throw new ProviderRequestError(
+      'Сессия Google недействительна (редирект на вход). Запустите pnpm webauth:google.',
       401,
     );
   }
@@ -315,7 +321,7 @@ const mapErrorCode = (code: number): ProviderRequestError => {
  */
 export const createGeminiWebProvider = (options: GeminiWebProviderOptions): ChatProvider => {
   const baseUrl = (options.baseUrl ?? GEMINI_WEB_BASE_URL).replace(/\/+$/u, '');
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? googleRequestAsync;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const now = options.now ?? Date.now;
   const loadAuth = options.loadAuth ?? loadGoogleAuthAsync;
@@ -360,7 +366,7 @@ export const createGeminiWebProvider = (options: GeminiWebProviderOptions): Chat
       headers['x-goog-ext-525001261-jspb'] = options.modelHeader;
     }
 
-    let response: Response;
+    let response: HttpResponseLike;
     try {
       response = await fetchImpl(`${baseUrl}${GENERATE_PATH}`, {
         method: 'POST',
@@ -386,6 +392,12 @@ export const createGeminiWebProvider = (options: GeminiWebProviderOptions): Chat
       if (response.status === 401 || response.status === 403) {
         throw new ProviderRequestError(
           'Сессия Google недействительна. Запустите pnpm webauth:google.',
+          401,
+        );
+      }
+      if (response.status >= 300 && response.status < 400) {
+        throw new ProviderRequestError(
+          'Сессия Google недействительна (редирект на вход). Запустите pnpm webauth:google.',
           401,
         );
       }

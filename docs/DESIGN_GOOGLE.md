@@ -149,6 +149,13 @@
 Access token `SNlM0e` **не хранится**: он извлекается из HTML страницы `/app`
 регуляркой `"SNlM0e":"(.*?)"` и кэшируется в памяти провайдера на 5 минут.
 
+> **Лимит заголовков.** Google отдаёт `/app` и `StreamGenerate` с ~30 КБ
+> заголовков (8 `Set-Cookie`), поэтому стандартный `fetch` падает с
+> `HeadersOverflowError`. Запросы идут через `undici.Client` с
+> `maxHeaderSize: 512 КБ` (`src/google/http.ts`); ответ 3xx считается
+> истёкшей сессией (401). Это же исправление понадобилось `webauth:google`,
+> иначе валидация молча не проходила и `google-auth.json` не сохранялся.
+
 ### 5.2. Протокол генерации
 
 ```
@@ -190,9 +197,9 @@ at=<SNlM0e>&f.req=<[null,"[[prompt],null,null]"]>
 
 - **Изображения не поддерживаются** Google-провайдерами: `image_url` даёт
   `400` с объяснением (KI-1018).
-- **Веб-протокол не проверен на живом аккаунте** в CI: тесты используют
-  синтетические кадры, повторяющие структуру открытой реализации
-  (KI-1017). Ломается при изменении Google — обновлять по захвату.
+- **Веб-протокол проверен живым прогоном** 2026-11-18 (`pong` за 15.6 с),
+  но остаётся неофициальным и может измениться без предупреждения
+  (KI-1019).
 - **Только один аккаунт**: cookie-сессия одна, как и `auth.json` DeepSeek
   (мультиаккаунтность — R-07-04).
 - **Нет инкрементального streaming**: ответ собирается целиком, как и
@@ -221,13 +228,15 @@ pnpm build
 
 ```powershell
 $env:GEMINI_API_KEY = '...'   # вариант API
-pnpm dev
-# DSH → Custom Provider → модель google-gemini-api-flash
+pnpm e2e:gemini --api         # Gemini API: pong + usage
 
 # вариант Web
 pnpm webauth:google
-# DSH → модель google-gemini-web
+pnpm e2e:gemini               # Gemini Web: pong за ~15 с
 ```
+
+`pnpm e2e:gemini` пишет лог в `docs/captures/e2e-gemini-*.log`
+(вне git), cookie и ключи в лог не попадают.
 
 ---
 

@@ -19,9 +19,9 @@
 
 | Статус | Количество | Записи |
 |---|---|---|
-| Open | 6 | KI-014, KI-015, KI-1016, KI-1017, KI-1018, KI-1019 |
+| Open | 5 | KI-014, KI-015, KI-1016, KI-1018, KI-1019 |
 | In Progress | 0 | — |
-| Fixed | 11 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-007, KI-008, KI-009, KI-011, KI-012, KI-016 |
+| Fixed | 12 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-007, KI-008, KI-009, KI-011, KI-012, KI-016, KI-1017 |
 | Documented | 1 | KI-001 |
 | Deferred | 1 | KI-010 |
 | Won't Fix | 1 | KI-013 |
@@ -32,7 +32,7 @@
 | Приоритет | Количество | Записи |
 |---|---|---|
 | 🔴 Critical | 1 | KI-005 |
-| 🟠 High | 7 | KI-002, KI-003, KI-004, KI-006, KI-007, KI-1016, KI-1017 |
+| 🟠 High | 6 | KI-002, KI-003, KI-004, KI-006, KI-007, KI-1016 |
 | 🟡 Medium | 9 | KI-008, KI-009, KI-011, KI-012, KI-013, KI-014, KI-016, KI-1018, KI-1019 |
 | 🟢 Low | 3 | KI-001, KI-010, KI-015 |
 | **Всего** | **20** | — |
@@ -315,22 +315,22 @@
 
 ## v0.6.2 — Google providers (2026-11-18)
 
-### KI-1017 — Протокол веб-чата Gemini не проверен на живом аккаунте (Open)
-- **Приоритет:** 🟠 High | **Статус:** Open | **Обнаружено:** 2026-11-18
-- **Файлы:** `src/google/gemini-web.ts`, `test/gemini-web.test.ts`,
-  `docs/DESIGN_GOOGLE.md`
+### KI-1017 — Протокол веб-чата Gemini не проверен на живом аккаунте (Fixed)
+- **Приоритет:** 🟠 High | **Статус:** Fixed | **Обнаружено:** 2026-11-18
+- **Исправлено в:** 0.6.3 (2026-11-18), живой e2e `pnpm e2e:gemini`
+- **Файлы:** `src/google/gemini-web.ts`, `src/google/http.ts`,
+  `test/gemini-web.test.ts`, `docs/DESIGN_GOOGLE.md`
 - **Описание:** Форма `f.req`, извлечение `SNlM0e` и разбор кадров
-  `StreamGenerate` сверены с открытой библиотекой `gemini_webapi` (v1.14.4,
-  `src/gemini_webapi/client.py`), но не проверены живым запросом: в CI нет
-  аккаунта Google, а `google-auth.json` содержит только cookie.
-- **Влияние:** модель `google-gemini-web` может отвечать `502`/`401`, если
-  фактический протокол Google отличается от фикстур. `google-gemini-api-*`
-  и DeepSeek не затронуты.
-- **План:** снять захват `StreamGenerate` в DevTools (Network → Copy as
-  cURL), сохранить локально в `docs/captures/` (не коммитить), сверить
-  `f.req`/кадры, добавить fixture в `test/gemini-web.test.ts`.
-- **Обходной путь:** использовать `google-gemini-api-flash`/`-pro`.
-- **Связанные:** KI-1019, DESIGN_GOOGLE § 5.2.
+  `StreamGenerate` были сверены только с открытой библиотекой
+  `gemini_webapi` (v1.14.4), без живого запроса.
+- **Исправление:** живой прогон 2026-11-18 подтвердил протокол: модель
+  `google-gemini-web` вернула `pong` за 15.6 с. Попутно найдена и устранена
+  реальная причина сбоя: Google отдаёт ~30 КБ заголовков (8 `Set-Cookie`),
+  стандартный `fetch` падал с `HeadersOverflowError`; запросы переведены на
+  `undici.Client` с `maxHeaderSize` 512 КБ. Регрессия закрыта тестами
+  `test/gemini-web.test.ts` и `test/webauth-google.test.ts`.
+- **Проверка:** `pnpm webauth:google` → `pnpm e2e:gemini` → `[4] E2E OK`.
+- **Связанные:** KI-1019 (хрупкость протокола), DESIGN_GOOGLE § 5.
 
 ### KI-1018 — Google-провайдеры не принимают изображения (Open)
 - **Приоритет:** 🟡 Medium | **Статус:** Open | **Обнаружено:** 2026-11-18

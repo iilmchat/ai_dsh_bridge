@@ -18,7 +18,7 @@ import {
   type ProviderCompletionResult,
   type ProviderUsage,
 } from '../providers/types.js';
-import { combineSignals, errorMessage, isAbortError, type FetchAsync } from './http.js';
+import { combineSignals, errorMessage, googleRequestAsync, isAbortError, type FetchAsync, type HttpResponseLike } from './http.js';
 
 /** Базовый URL Gemini API по умолчанию. */
 export const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com';
@@ -128,7 +128,7 @@ const parseErrorMessage = (bodyText: string): string => {
  */
 export const createGeminiApiProvider = (options: GeminiApiProviderOptions): ChatProvider => {
   const baseUrl = (options.baseUrl ?? GEMINI_API_BASE_URL).replace(/\/+$/u, '');
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? googleRequestAsync;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const apiKey = options.apiKey;
   const isConfigured = apiKey !== undefined && apiKey !== '';
@@ -157,7 +157,7 @@ export const createGeminiApiProvider = (options: GeminiApiProviderOptions): Chat
     };
 
     const url = `${baseUrl}/v1beta/models/${encodeURIComponent(request.upstreamModel)}:generateContent`;
-    let response: Response;
+    let response: HttpResponseLike;
     try {
       response = await fetchImpl(url, {
         method: 'POST',
