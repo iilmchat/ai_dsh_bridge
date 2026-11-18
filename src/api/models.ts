@@ -1,14 +1,13 @@
 /**
  * `GET /v1/models`: список моделей для Custom Provider DSH.
  *
- * В карточку добавлены `capabilities` (`tools`, `function_calling`,
- * `streaming`): DSH проверяет их, прежде чем передавать `tools` в
- * `/v1/chat/completions`. Без этого инструменты могут не отправляться.
+ * Список строится из реестра провайдеров (`src/providers/model-registry.ts`),
+ * поэтому DeepSeek и Google-модели описываются в одном месте. В карточку
+ * добавлены `capabilities` (`tools`, `function_calling`, `streaming`): DSH
+ * проверяет их, прежде чем передавать `tools` в `/v1/chat/completions`.
  */
 import type { FastifyInstance } from 'fastify';
-
-/** Идентификаторы моделей, доступных DSH через шлюз. */
-const MODEL_IDS = ['deepseek-web-chat', 'deepseek-web-reasoner'] as const;
+import { listProviderModels } from '../providers/model-registry.js';
 
 /** Возможности модели (как их понимает DSH/OpenAI-клиент). */
 export interface ModelCapabilities {
@@ -46,11 +45,11 @@ const CAPABILITIES: ModelCapabilities = {
 export const registerModelsRoute = (app: FastifyInstance): void => {
   app.get('/v1/models', (): ModelsListResponse => ({
     object: 'list',
-    data: MODEL_IDS.map((id) => ({
-      id,
+    data: listProviderModels().map((model) => ({
+      id: model.id,
       object: 'model' as const,
       created: 0,
-      owned_by: 'deepseek-web',
+      owned_by: model.provider,
       capabilities: CAPABILITIES,
     })),
   }));

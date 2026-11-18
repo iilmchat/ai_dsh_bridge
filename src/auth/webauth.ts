@@ -171,11 +171,13 @@ export const findChromeExecutable = (
  * @param chromePath Путь к chrome.exe.
  * @param port Порт CDP.
  * @param profileDir Каталог профиля.
+ * @param startUrl Стартовая страница (по умолчанию `chat.deepseek.com`).
  */
 export const launchChromeAsync = async (
   chromePath: string,
   port: number,
   profileDir: string,
+  startUrl = 'https://chat.deepseek.com',
 ): Promise<void> => {
   await mkdir(profileDir, { recursive: true });
   const child = spawn(
@@ -185,7 +187,7 @@ export const launchChromeAsync = async (
       `--user-data-dir=${profileDir}`,
       '--no-first-run',
       '--no-default-browser-check',
-      'https://chat.deepseek.com',
+      startUrl,
     ],
     { detached: true, stdio: 'ignore' },
   );

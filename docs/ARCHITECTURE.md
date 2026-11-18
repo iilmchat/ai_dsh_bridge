@@ -761,9 +761,30 @@ data: [DONE]
 ### 8.1. Новый провайдер
 
 Новый upstream подключается на уровне L3 и L4: реализуется интерфейс
-клиента (стриминг + non-streaming), модели регистрируются в `/v1/models`.
-Слой L2 остаётся общим, если новый провайдер тоже проходит через текстовый
-формат вызова инструментов; иначе добавляется отдельный реконструктор.
+`ChatProvider` (`src/providers/types.ts`), модель добавляется в реестр
+`PROVIDER_MODELS` (`src/providers/model-registry.ts`), после чего она
+появляется в `/v1/models` и в роутинге `/v1/chat/completions`. Слой L2
+остаётся общим, если провайдер проходит через текстовый формат вызова
+инструментов (так работают DeepSeek, Gemini API и Gemini Web); иначе
+добавляется отдельный реконструктор.
+
+### 8.6. Google-провайдеры (v0.6.2)
+
+| Модуль | Роль |
+|---|---|
+| `src/providers/types.ts` | контракт `ChatProvider`, `ProviderUsage`, ошибки `ProviderNotConfiguredError`/`ProviderRequestError` |
+| `src/providers/model-registry.ts` | `PROVIDER_MODELS`: `id` → провайдер/`upstreamModel`; источник `/v1/models` и выбора ветки в обработчике |
+| `src/google/gemini-api.ts` | официальный `:generateContent` (`x-goog-api-key`, `systemInstruction`, `contents`, `generationConfig`), `usageMetadata`, маппинг статусов |
+| `src/google/gemini-web.ts` | веб-чат `StreamGenerate` (`at`/`f.req`), `SNlM0e` из `/app` с кэшем, разбор кадров, коды ошибок Google |
+| `src/google/auth.ts` | `google-auth.json` (strict Zod), заголовок `Cookie`, сохранение `0600` |
+| `src/auth/webauth-google.ts` | CDP-захват cookie `google.com` (`pnpm webauth:google`) |
+
+Роутинг: `src/api/completions.ts` резолвит `model` через реестр; неизвестная
+модель → `400`. DeepSeek-ветка сохраняет PoW/сессию/`ref_file_ids`,
+Google-ветка вызывает `completeAsync` и получает готовый текст, который
+разбирается общим DSML-парсером. Изображения Google-провайдерам пока не
+передаются (KI-1018), веб-протокол неофициальный (KI-1017, KI-1019);
+детали — [DESIGN_GOOGLE.md](DESIGN_GOOGLE.md).
 
 ### 8.2. CDP как основной транспорт
 

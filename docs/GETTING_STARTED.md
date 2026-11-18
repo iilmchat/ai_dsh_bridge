@@ -1,23 +1,26 @@
 # AI DSH Bridge — руководство по началу работы
 
-**Версия:** 0.6.1 (scaffold)
-**Дата:** 2026-10-19
-**Связанные документы:** [DESIGN.md](./DESIGN.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [RULES.md](./RULES.md), [KNOWN_ISSUES.md](./KNOWN_ISSUES.md)
+**Версия:** 0.6.2 (scaffold)
+**Дата:** 2026-11-18
+**Связанные документы:** [DESIGN.md](./DESIGN.md), [DESIGN_GOOGLE.md](./DESIGN_GOOGLE.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [RULES.md](./RULES.md), [KNOWN_ISSUES.md](./KNOWN_ISSUES.md)
 
-> **Что уже работает в v0.6.1.** `GET /health`, `GET /v1/models`,
-> `pnpm webauth`, клиент DeepSeek с PoW, Prompt Builder, DSML-парсер и
-> `POST /v1/chat/completions` в обоих режимах: `stream: false` (JSON) и
-> `stream: true` (OpenAI SSE с `tool_calls`).
+> **Что уже работает в v0.6.2.** `GET /health`, `GET /v1/models`,
+> `pnpm webauth`, `pnpm webauth:google`, клиент DeepSeek с PoW, Prompt
+> Builder, DSML-парсер и `POST /v1/chat/completions` в обоих режимах:
+> `stream: false` (JSON) и `stream: true` (OpenAI SSE с `tool_calls`).
+> С 0.6.2 доступны Google-провайдеры: Gemini API по ключу и веб-чат
+> `gemini.google.com` по cookie-сессии.
 
 ---
 
 ## 0. Матрица готовности шагов
 
-| Шаг руководства | Что проверяет | Статус в v0.6.1 |
+| Шаг руководства | Что проверяет | Статус в v0.6.2 |
 |---|---|---|
 | §1–2. Требования и установка | Node.js 22+, pnpm, зависимости | ✅ доступно |
 | §4. Запуск каркаса | `pnpm dev`, `/health`, `/v1/models` | ✅ доступно |
 | §3. Аутентификация | `pnpm webauth`, `~/.ai-dsh-bridge/auth.json` | ✅ доступно (0.2.0) |
+| §3.1. Google (Gemini) | `GEMINI_API_KEY` / `pnpm webauth:google` | ✅ доступно (0.6.2) |
 | §5. Настройка DSH | Custom Provider в DSH | ⚠️ список моделей доступен; ответы — после подключения `/v1/chat/completions` |
 | §6.1. Простой чат | `content`-стриминг реального ответа | ⏳ после подключения L2/L3 к фасаду (KI-002) |
 | §6.2. Tool-call цикл | `tool_calls` → `bash` → `role: tool` | ⏳ после этапов 4–7 |
@@ -34,8 +37,10 @@
 |---|---|---|---|
 | Node.js | 22.0.0 (`engines` в `package.json`) | `node -v` | Нужен `fetch`, `AbortSignal`, ESM |
 | pnpm | 9.x | `pnpm -v` | Проект использует `pnpm-lock.yaml` |
-| Chrome / Chromium | Актуальный стабильный | `chrome://version` | Нужен только для `pnpm webauth` |
+| Chrome / Chromium | Актуальный стабильный | `chrome://version` | Нужен только для `pnpm webauth` / `webauth:google` |
 | DeepSeek-аккаунт | Действующий | — | Вход выполняется вручную в браузере |
+| Google AI Studio (опционально) | API-ключ | [aistudio.google.com](https://aistudio.google.com/apikey) | Для `google-gemini-api-*` |
+| Google-аккаунт (опционально) | Доступ к Gemini | — | Для `google-gemini-web` |
 | Свободные порты | `3456`, `9222` | см. §7 | `3456` — шлюз, `9222` — CDP при `webauth` |
 | ОС | Windows 10/11, macOS, Linux | — | Команды ниже даны для PowerShell и bash |
 
@@ -118,6 +123,39 @@ pnpm typecheck
 > может нарушать условия DeepSeek. Рекомендуется отдельный аккаунт; проект
 > не гарантирует сохранность аккаунта (DESIGN §11).
 
+### 3.1. Google (Gemini)
+
+Google подключается двумя независимыми способами; можно использовать любой
+или оба (подробности — [DESIGN_GOOGLE.md](./DESIGN_GOOGLE.md)).
+
+**Gemini API (официальный, по ключу).** Добавьте в `.env`:
+
+```powershell
+GEMINI_API_KEY=<ключ Google AI Studio>
+# опционально:
+GEMINI_API_BASE_URL=https://generativelanguage.googleapis.com
+GEMINI_TIMEOUT_MS=120000
+```
+
+Модели: `google-gemini-api-flash`, `google-gemini-api-pro`.
+
+**Gemini Web (cookie-сессия `gemini.google.com`).**
+
+```powershell
+pnpm webauth:google
+```
+
+Скрипт откроет Chrome (CDP `:9222`, профиль
+`~/.ai-dsh-bridge/chrome-profile`) на `https://gemini.google.com/app` и будет
+ждать входа до 5 минут. После входа cookie сохраняются в
+`~/.ai-dsh-bridge/google-auth.json` (права `0600`, вне репозитория).
+Модель: `google-gemini-web`. Access token `SNlM0e` не сохраняется — шлюз
+перевыпускает его запросом `/app` и кэширует на 5 минут.
+
+> Веб-чат — неофициальный путь: протокол может измениться (KI-1017,
+> KI-1019), изображения пока не поддерживаются (KI-1018). Использование
+> веб-чата может нарушать условия Google — отдельный аккаунт.
+
 ---
 
 ## 4. Запуск и проверка каркаса
@@ -133,7 +171,7 @@ pnpm dev
 
 ```text
 {"level":30,"time":1760886000000,"pid":12345,"hostname":"dev","msg":"Server listening at http://127.0.0.1:3456"}
-{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.6.1 listening on http://127.0.0.1:3456"}
+{"level":30,"time":1760886000100,"pid":12345,"hostname":"dev","msg":"AI DSH Bridge v0.6.2 listening on http://127.0.0.1:3456"}
 ```
 
 Сервер слушает **только loopback** (`127.0.0.1`). Порт берётся из `PORT`
@@ -163,7 +201,7 @@ pnpm dev:kill
 pnpm run version
 ```
 
-Выводит текущую версию из `package.json` (например, `0.6.1`).
+Выводит текущую версию из `package.json` (например, `0.6.2`).
 Команда `pnpm version` зарезервирована самим pnpm (semver-bump), поэтому
 для вывода используется `pnpm run version`.
 
@@ -182,7 +220,7 @@ curl -s http://127.0.0.1:3456/health
 ```json
 {
   "status": "ok",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "uptime_sec": 12
 }
 ```
@@ -205,14 +243,21 @@ curl -s http://127.0.0.1:3456/v1/models
   "object": "list",
   "data": [
     { "id": "deepseek-web-chat", "object": "model", "created": 0, "owned_by": "deepseek-web" },
-    { "id": "deepseek-web-reasoner", "object": "model", "created": 0, "owned_by": "deepseek-web" }
+    { "id": "deepseek-web-reasoner", "object": "model", "created": 0, "owned_by": "deepseek-web" },
+    { "id": "google-gemini-api-flash", "object": "model", "created": 0, "owned_by": "google-gemini-api" },
+    { "id": "google-gemini-api-pro", "object": "model", "created": 0, "owned_by": "google-gemini-api" },
+    { "id": "google-gemini-web", "object": "model", "created": 0, "owned_by": "google-gemini-web" }
   ]
 }
 ```
 
+Google-модели видны в списке всегда: доступность зависит от настроек
+(`GEMINI_API_KEY` / `google-auth.json`), а не от `GET /v1/models`.
+
 ### 4.4. Проверка `POST /v1/chat/completions` (JSON и SSE)
 
-В v0.6.1 работают оба режима — при наличии `auth.json` (иначе `401`).
+В v0.6.2 работают оба режима — при наличии `auth.json` для DeepSeek или
+настроенного Google-провайдера (иначе `401`).
 
 Non-streaming (`stream: false`):
 
@@ -304,7 +349,8 @@ pnpm e2e:tools -- --verbose
 > (`GET /v1/models` работает). Шлюз поддерживает и `stream:false`, и
 > `stream:true` (SSE с `tool_calls`, K2/0.5.0), поэтому DSH может
 > использовать его как Custom Provider; сквозной tool-call цикл подтверждён
-> живым e2e DSH (`bash` выполнен, результат возвращён в модель).
+> живым e2e DSH (`bash` выполнен, результат возвращён в модель). С 0.6.2
+> доступны Google-модели (`google-gemini-api-*`, `google-gemini-web`).
 
 > Если шлюз запущен не на `3456` (см. §4.1), замените порт в `openaiURL`,
 > например `http://localhost:3457/v1/chat/completions`.
@@ -320,7 +366,8 @@ pnpm e2e:tools -- --verbose
    - **API Key** — любая непустая строка, например `sk-dummy` (шлюз ключ
      не проверяет, аутентификация встроена в сессию DeepSeek);
    - **Model** — `deepseek-web-chat`; при необходимости добавьте
-     `deepseek-web-reasoner`.
+     `deepseek-web-reasoner`, `google-gemini-api-flash`,
+     `google-gemini-api-pro` или `google-gemini-web`.
 3. Нажмите **Fetch available models**, чтобы DSH обратился к
    `GET /v1/models`, либо добавьте модель вручную.
 4. Сохраните провайдера и выберите `deepseek-web-chat` для сессии.
@@ -339,6 +386,9 @@ llm-pi-ai:
       models:
         - deepseek-web-chat
         # - deepseek-web-reasoner
+        # - google-gemini-api-flash
+        # - google-gemini-api-pro
+        # - google-gemini-web
 ```
 
 `apiKeyEnv` указывает на переменную окружения, из которой DSH берёт
@@ -356,7 +406,8 @@ llm-pi-ai:
 
 ### 6.1. Простой чат
 
-> ⏳ **После этапов 2–3** (аутентификация → клиент DeepSeek + PoW).
+> ✅ **Доступно** (этапы 2–3, 0.2.0; SSE — 0.5.0). Для Google-моделей —
+> после настройки `GEMINI_API_KEY` / `webauth:google` (§3.1).
 
 1. Убедитесь, что `pnpm webauth` уже выполнялся и сессия сохранена.
 2. Запустите `pnpm dev` и убедитесь, что `/health` отвечает `ok`.
@@ -367,8 +418,8 @@ llm-pi-ai:
 
 ### 6.2. Tool-call цикл (`bash`)
 
-> ⏳ **После этапов 4–7** (DSML-инъекция, парсер, SSE `tool_calls`,
-> полный цикл).
+> ✅ **Доступно** (этапы 4–7, 0.5.0): DSML-инъекция, парсер, SSE
+> `tool_calls`, полный цикл подтверждён живым DSH e2e.
 
 1. В DSH попросите выполнить команду: «Выполни `pwd` через bash и покажи
    вывод».
@@ -387,7 +438,7 @@ llm-pi-ai:
 
 ### 6.3. Что смотреть в логах
 
-- старт сервера: `AI DSH Bridge v0.6.1 listening on ...`;
+- старт сервера: `AI DSH Bridge v0.6.2 listening on ...`;
 - `requestId` запроса и модель;
 - статус upstream-ответа и длительность PoW (ориентир 100–500 мс);
 - число распознанных `tool_calls` и `finish_reason`;
@@ -460,6 +511,11 @@ Zod-схемой на старте. С v0.1.2 `.env` опционален и з�
 | `DEEPSEEK_BASE_URL` | `https://chat.deepseek.com` | Валидный URL | Базовый URL upstream; менять только для отладки/зеркала |
 | `AUTH_FILE` | `~/.ai-dsh-bridge/auth.json` | Путь; `~` раскрывается | Файл с сессией DeepSeek (`webauth`) |
 | `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | Уровень логирования Fastify/pino |
+| `GEMINI_API_KEY` | — (пусто) | Строка ключа | Ключ Google AI Studio для `google-gemini-api-*` |
+| `GEMINI_API_BASE_URL` | `https://generativelanguage.googleapis.com` | Валидный URL | Базовый URL Gemini API |
+| `GEMINI_WEB_BASE_URL` | `https://gemini.google.com` | Валидный URL | Базовый URL веб-чата Gemini |
+| `GOOGLE_AUTH_FILE` | `~/.ai-dsh-bridge/google-auth.json` | Путь; `~` раскрывается | Файл с cookie-сессией Google (`webauth:google`) |
+| `GEMINI_TIMEOUT_MS` | `120000` | 1000–600000 | Таймаут запросов к Google, мс |
 
 ### 8.1. Как задать переменные
 
@@ -497,12 +553,13 @@ pnpm dev
 
 Все команды — из `package.json`; других CLI-флагов проект не вводит.
 
-| Команда | Что делает | Статус в v0.6.1 |
+| Команда | Что делает | Статус в v0.6.2 |
 |---|---|---|
 | `pnpm dev` | Запуск с `tsx watch --env-file-if-exists=.env` | ✅ |
 | `pnpm build` | Сборка TypeScript (`tsc -p tsconfig.build.json`) | ✅ |
 | `pnpm start` | Запуск собранного `dist/index.js` (`--env-file-if-exists=.env`) | ✅ (после `pnpm build`) |
-| `pnpm webauth` | Одноразовый захват сессии DeepSeek | ⏳ после этапа 2 |
+| `pnpm webauth` | Одноразовый захват сессии DeepSeek | ✅ |
+| `pnpm webauth:google` | Одноразовый захват cookie-сессии Google (Gemini Web) | ✅ (0.6.2) |
 | `pnpm typecheck` | Проверка типов без эмита | ✅ |
 | `pnpm lint` | oxlint с type-aware проверками | ✅ |
 | `pnpm test` | vitest (пока тестов нет — `--passWithNoTests`) | ✅ |

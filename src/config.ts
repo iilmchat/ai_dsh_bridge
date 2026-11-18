@@ -32,6 +32,13 @@ const EnvSchema = z.object({
   DEEPSEEK_BASE_URL: z.url().default('https://chat.deepseek.com'),
   AUTH_FILE: z.string().min(1).default(join(DEFAULT_HOME_DIR, 'auth.json')),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+  // Gemini API (официальный, по ключу Google AI Studio).
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_BASE_URL: z.url().default('https://generativelanguage.googleapis.com'),
+  // Gemini Web (cookie-сессия gemini.google.com, захват `pnpm webauth:google`).
+  GEMINI_WEB_BASE_URL: z.url().default('https://gemini.google.com'),
+  GOOGLE_AUTH_FILE: z.string().min(1).default(join(DEFAULT_HOME_DIR, 'google-auth.json')),
+  GEMINI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(120_000),
 });
 
 /** Валидированная конфигурация шлюза. */
@@ -48,6 +55,16 @@ export interface BridgeConfig {
   readonly authFile: string;
   /** Уровень логирования Fastify/pino. */
   readonly logLevel: LogLevel;
+  /** API-ключ Google AI Studio (если задан — доступен провайдер Gemini API). */
+  readonly geminiApiKey: string | undefined;
+  /** Базовый URL `generativelanguage.googleapis.com`. */
+  readonly geminiApiBaseUrl: string;
+  /** Базовый URL `gemini.google.com`. */
+  readonly geminiWebBaseUrl: string;
+  /** Путь к `google-auth.json` с cookie-сессией Google. */
+  readonly googleAuthFile: string;
+  /** Таймаут запросов к Google, мс. */
+  readonly geminiTimeoutMs: number;
 }
 
 /**
@@ -80,6 +97,11 @@ export const loadConfig = (source: NodeJS.ProcessEnv = process.env): BridgeConfi
     baseUrl: env.DEEPSEEK_BASE_URL,
     authFile: resolvePath(env.AUTH_FILE),
     logLevel: env.LOG_LEVEL,
+    geminiApiKey: env.GEMINI_API_KEY,
+    geminiApiBaseUrl: env.GEMINI_API_BASE_URL,
+    geminiWebBaseUrl: env.GEMINI_WEB_BASE_URL,
+    googleAuthFile: resolvePath(env.GOOGLE_AUTH_FILE),
+    geminiTimeoutMs: env.GEMINI_TIMEOUT_MS,
   };
 };
 

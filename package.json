@@ -1,6 +1,6 @@
 {
   "name": "ai_dsh_bridge",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "OpenAI-compatible gateway for DeepSeek Harness via chat.deepseek.com",
   "type": "module",
   "license": "MIT",
@@ -14,6 +14,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "webauth": "tsx --env-file-if-exists=.env src/auth/webauth.ts",
+    "webauth:google": "tsx --env-file-if-exists=.env src/auth/webauth-google.ts",
     "e2e:deepseek": "tsx --env-file-if-exists=.env scripts/e2e-deepseek.ts",
     "e2e:tools": "tsx --env-file-if-exists=.env scripts/e2e-tools.ts",
     "test": "vitest run --passWithNoTests",

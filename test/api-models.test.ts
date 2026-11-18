@@ -23,10 +23,13 @@ describe('GET /v1/models', () => {
     expect(body.data.map((model: { id: string }) => model.id)).toEqual([
       'deepseek-web-chat',
       'deepseek-web-reasoner',
+      'google-gemini-api-flash',
+      'google-gemini-api-pro',
+      'google-gemini-web',
     ]);
     for (const model of body.data) {
       expect(model.object).toBe('model');
-      expect(model.owned_by).toBe('deepseek-web');
+      expect(typeof model.owned_by).toBe('string');
     }
   });
 

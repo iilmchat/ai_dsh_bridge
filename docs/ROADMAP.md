@@ -1,8 +1,9 @@
 # Roadmap AI DSH Bridge
 
-**Версия:** 0.6.1 · **Дата:** 2026-10-20 · **Статус:** актуален
-**Связанные документы:** [DESIGN.md](DESIGN.md), [DESIGN_V06_VISION.md](DESIGN_V06_VISION.md),
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) (Backlog, KI-1001…KI-1015).
+**Версия:** 0.6.2 · **Дата:** 2026-11-18 · **Статус:** актуален
+**Связанные документы:** [DESIGN.md](DESIGN.md), [DESIGN_GOOGLE.md](DESIGN_GOOGLE.md),
+[DESIGN_V06_VISION.md](DESIGN_V06_VISION.md),
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) (Backlog, KI-1001…KI-1022).
 
 Карта развития фиксирует идеи, которые пока не реализованы, чтобы они не
 потерялись и не дублировались в реестре проблем. Roadmap — не обещание
@@ -24,6 +25,7 @@
 | Версия | Тема | Приоритет | Статус | Ключевые ID |
 |---|---|---|---|---|
 | v0.6.0 | Vision & Multimodal | 🔴 Critical для агента | Done (S1–S3; S4 — Deferred, R-06-04 — Won't Fix) | R-06-01…R-06-04 |
+| v0.6.2 | Google Provider | 🟠 High | Done (R-06-05…R-06-07; KI-1017…KI-1019 — Open) | R-06-05…R-06-07 |
 | v0.7.0 | Performance & Reliability | 🟠 High | Planned | R-07-01…R-07-04 |
 | v0.8.0 | Ecosystem | 🟡 Medium | Planned | R-08-01…R-08-04 |
 | v0.9.0 | Advanced | 🟢 Low | Deferred | R-09-01…R-09-03 |
@@ -59,6 +61,33 @@
 
 **Риски:** приватность (экран может содержать токены/переписку); качество
 OCR на сложных шрифтах; лимиты DeepSeek на размер/тип изображения.
+
+---
+
+## v0.6.2 — Google Provider (🟠 High)
+
+**Зачем.** Шлюз был привязан к `chat.deepseek.com`, а DSH мог выбрать только
+DeepSeek-модели. Нужен доступ к **Google ИИ-чату** двумя независимыми путями:
+официальным API (стабильно, по ключу) и веб-чатом (без ключа, по cookie).
+
+**Результат этапа:** DSH видит `google-gemini-api-flash`,
+`google-gemini-api-pro`, `google-gemini-web`; L2 (DSML) общий, контракт
+OpenAI/SSE не изменился (DESIGN_GOOGLE.md).
+
+| ID | Фича | Приоритет | Статус | Описание |
+|---|---|---|---|---|
+| R-06-05 | Gemini API (официальный) | 🟠 High | Done 2026-11-18 | `GEMINI_API_KEY` → `POST /v1beta/models/{model}:generateContent` (`x-goog-api-key`), `systemInstruction` + `contents` + `generationConfig`, `thought`-части отбрасываются, usage из `usageMetadata`, маппинг ошибок 401/403/429/5xx/blockReason. |
+| R-06-06 | Gemini Web (веб-чат) | 🟠 High | Done 2026-11-18 | `pnpm webauth:google` захватывает cookie `google.com` в `google-auth.json`; клиент `StreamGenerate` (`at`/`f.req`) извлекает `SNlM0e` из `/app` (кэш 5 мин) и разбирает кадры `wrb.fr`; коды 1037/1052/1060 смаплены. |
+| R-06-07 | Слой провайдеров | 🟡 Medium | Done 2026-11-18 | `ChatProvider` + `ProviderNotConfiguredError`/`ProviderRequestError`, реестр `PROVIDER_MODELS`, роутинг по `model` в `/v1/chat/completions`; `GET /v1/models` строится из реестра. |
+
+**Критерии готовности (выполнены):** запрос к Google-модели проходит тот же
+L2-цикл (`tools` → DSML → `tool_calls`), ошибки возвращаются в
+OpenAI-формате, `pnpm typecheck/lint/test/build` зелёные (168 тестов), живая
+проверка возможна после `GEMINI_API_KEY`/`webauth:google`.
+
+**Риски:** веб-протокол неофициальный и не проверен на живом аккаунте
+(KI-1017, KI-1019); изображения Google-провайдерам пока не передаются
+(KI-1018); лимиты бесплатного аккаунта Google.
 
 ---
 
@@ -116,6 +145,8 @@ OCR на сложных шрифтах; лимиты DeepSeek на размер/
 ```text
 v0.6.0: R-06-01 (OCR) + R-06-03 (ref_file_ids) ──> Done
         R-06-02 (LLaVA) — Deferred, R-06-04 (screenshot tool) — Won't Fix
+v0.6.2: R-06-07 (реестр/контракт провайдеров) → R-06-05 (Gemini API);
+        R-06-06 (Gemini Web) зависит от веб-протокола Google (KI-1017/1019).
 v0.7.0: R-07-01 (PoW) независим; R-07-02 (streaming) зависит от
         текущего DSML-парсера и SSE-writer; R-07-03 — от клиента DeepSeek.
 v0.8.0: R-08-01/02 — упаковка; R-08-03 — prompt/модель; R-08-04 — метрики.

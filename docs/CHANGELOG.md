@@ -24,6 +24,57 @@
 
 ---
 
+## [0.6.2] — 2026-11-18
+
+### Added
+
+- **Google ИИ-чат двумя провайдерами** (DESIGN_GOOGLE.md): официальный
+  **Gemini API** по ключу и веб-чат **`gemini.google.com`** по cookie-сессии.
+  DSH видит модели `google-gemini-api-flash`, `google-gemini-api-pro`,
+  `google-gemini-web` и может использовать их так же, как `deepseek-web-*`.
+- `src/providers/types.ts` — контракт `ChatProvider`
+  (`isConfiguredAsync`/`completeAsync`), `ProviderNotConfiguredError`,
+  `ProviderRequestError`; `src/providers/model-registry.ts` — единый реестр
+  `PROVIDER_MODELS` (id → провайдер/upstream-модель).
+- `src/google/gemini-api.ts` — клиент `:generateContent`
+  (`x-goog-api-key`, `systemInstruction`/`contents`/`generationConfig`),
+  отбрасывание `thought`-частей, `usageMetadata`, маппинг 401/403→401,
+  429/5xx→503, `blockReason`→400.
+- `src/google/gemini-web.ts` — клиент `StreamGenerate` (`at`/`f.req`),
+  извлечение `SNlM0e` из `/app` с кэшем на 5 минут, разбор инкрементальных
+  кадров `wrb.fr`, коды ошибок 1037→503, 1052→502, 1060→403.
+- `src/google/auth.ts` и `pnpm webauth:google` — CDP-захват cookie домена
+  `google.com` в `~/.ai-dsh-bridge/google-auth.json` (права `0600`),
+  проверка сессии запросом `/app`.
+- Переменные окружения `GEMINI_API_KEY`, `GEMINI_API_BASE_URL`,
+  `GEMINI_WEB_BASE_URL`, `GOOGLE_AUTH_FILE`, `GEMINI_TIMEOUT_MS`.
+- Тесты: `gemini-api` (8), `gemini-web` (9), `webauth-google` (5),
+  `providers` (6), `api-completions-google` (4); всего в наборе 168.
+
+### Changed
+
+- `src/api/completions.ts`: модель резолвится через реестр (неизвестная →
+  `400 invalid_request_error`), добавлена Google-ветка с общим L2
+  (DSML-инструкция + парсер); поведение DeepSeek-ветки не изменилось.
+- `src/translate/prompt.ts`: `buildPromptParts` разделяет запрос на
+  системную часть и транскрипт; `buildPromptAsync` склеивает их как раньше,
+  Gemini API получает `systemInstruction` отдельно.
+- `src/api/models.ts`: список моделей строится из реестра, `owned_by`
+  равен идентификатору провайдера.
+- `src/auth/webauth.ts`: `launchChromeAsync` принимает стартовый URL
+  (используется `webauth:google`).
+- Версия `0.6.2` в `package.json` и `APP_VERSION`; обновлены
+  README, GETTING_STARTED, ARCHITECTURE, ROADMAP, PROMPT_CURRENT.
+
+### Known issues
+
+- KI-1017 — веб-протокол Gemini не проверен на живом аккаунте (тесты на
+  синтетических кадрах).
+- KI-1018 — Google-провайдеры не принимают изображения (`image_url` → 400).
+- KI-1019 — веб-протокол Google может измениться без предупреждения.
+
+---
+
 ## [0.6.1] — 2026-10-20
 
 ### Added

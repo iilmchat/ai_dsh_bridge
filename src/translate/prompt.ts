@@ -240,21 +240,29 @@ C:\\path\\to\\file.png»). Не пытайся вставить файл в ча
 проверяй cwd, если задача связана с файлами.`;
 };
 
+/** Результат разделения prompt'а на системную часть и транскрипт. */
+export interface BuildPromptPartsResult {
+  /** Системная часть: system-сообщения DSH и DSML-инструкция. */
+  readonly system: string;
+  /** Транскрипт диалога: блоки `[USER]`/`[ASSISTANT]`/`[TOOL_RESULT]`. */
+  readonly conversation: string;
+  /** Имена инструментов, реально внедрённых в prompt (для отладки). */
+  readonly toolsInjected: readonly string[];
+}
+
 /**
- * Превращает OpenAI-запрос (`messages` + `tools`) в один prompt для DeepSeek.
+ * Разделяет OpenAI-запрос на системную инструкцию и транскрипт.
  *
- * `system`-сообщения сливаются с DSML-инструкцией в один блок `[SYSTEM]` в
- * начале prompt'а: DeepSeek Web принимает только одну строку `prompt`, а
- * инструкция должна иметь приоритет над историей. `toolChoice: 'none'`
- * отключает внедрение инструментов; `'required'`/конкретная функция
- * добавляют требование обязательно вызвать инструмент.
+ * Нужно провайдерам с отдельным полем системной инструкции (Gemini API:
+ * `systemInstruction`). DeepSeek получает обе части склеенными в один prompt
+ * через `buildPromptAsync`.
  *
  * @param options Сообщения, инструменты и политика выбора.
- * @returns Prompt и имена внедрённых инструментов.
+ * @returns Системная часть, транскрипт и имена внедрённых инструментов.
  * @throws PromptValidationError если `messages` пуст или `toolChoice`
  * несовместим с `tools`.
  */
-export const buildPromptAsync = (options: BuildPromptOptions): BuildPromptResult => {
+export const buildPromptParts = (options: BuildPromptOptions): BuildPromptPartsResult => {
   const { messages, tools, toolChoice } = options;
   if (messages.length === 0) {
     throw new PromptValidationError('messages пуст: Prompt Builder требует хотя бы одно сообщение');
@@ -299,9 +307,6 @@ export const buildPromptAsync = (options: BuildPromptOptions): BuildPromptResult
   }
 
   const blocks: string[] = [];
-  if (systemContents.length > 0) {
-    blocks.push(`[SYSTEM]\n${systemContents.join('\n\n')}`);
-  }
 
   for (const message of messages) {
     if (message.role === 'system') {
@@ -332,5 +337,34 @@ export const buildPromptAsync = (options: BuildPromptOptions): BuildPromptResult
     blocks.push(`[ASSISTANT]\n${content}`);
   }
 
-  return { prompt: blocks.join('\n\n'), toolsInjected };
+  return {
+    system: systemContents.join('\n\n'),
+    conversation: blocks.join('\n\n'),
+    toolsInjected,
+  };
+};
+
+/**
+ * Превращает OpenAI-запрос (`messages` + `tools`) в один prompt для DeepSeek.
+ *
+ * `system`-сообщения сливаются с DSML-инструкцией в один блок `[SYSTEM]` в
+ * начале prompt'а: DeepSeek Web принимает только одну строку `prompt`, а
+ * инструкция должна иметь приоритет над историей. `toolChoice: 'none'`
+ * отключает внедрение инструментов; `'required'`/конкретная функция
+ * добавляют требование обязательно вызвать инструмент.
+ *
+ * @param options Сообщения, инструменты и политика выбора.
+ * @returns Prompt и имена внедрённых инструментов.
+ * @throws PromptValidationError если `messages` пуст или `toolChoice`
+ * несовместим с `tools`.
+ */
+export const buildPromptAsync = (options: BuildPromptOptions): BuildPromptResult => {
+  const parts = buildPromptParts(options);
+  const prompt =
+    parts.system === ''
+      ? parts.conversation
+      : parts.conversation === ''
+        ? `[SYSTEM]\n${parts.system}`
+        : `[SYSTEM]\n${parts.system}\n\n${parts.conversation}`;
+  return { prompt, toolsInjected: parts.toolsInjected };
 };

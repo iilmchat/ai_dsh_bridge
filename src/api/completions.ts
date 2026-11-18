@@ -10,7 +10,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { loadAuthAsync, type Auth } from '../config.js';
+import { loadAuthAsync, loadConfig, type Auth } from '../config.js';
 import {
   createChatSessionAsync,
   fetchFilesAsync,
@@ -31,9 +31,23 @@ import {
   DeepSeekNonSseError,
 } from '../deepseek/errors.js';
 import type { ChatCompletionRequest as DeepSeekCompletionRequest } from '../deepseek/types.js';
+import { GoogleAuthError, GoogleAuthNotFoundError } from '../google/errors.js';
+import { createGeminiApiProvider } from '../google/gemini-api.js';
+import { createGeminiWebProvider } from '../google/gemini-web.js';
+import {
+  listProviderModelIds,
+  resolveProviderModel,
+  type ProviderModel,
+} from '../providers/model-registry.js';
+import {
+  ProviderNotConfiguredError,
+  ProviderRequestError,
+  type ChatProvider,
+  type ProviderCompletionResult,
+} from '../providers/types.js';
 import { assembleTextFromEvents, type AssembledText } from '../translate/assemble.js';
-import { parseDsml, type ParsedDsml } from '../translate/dsml-parser.js';
-import { buildPromptAsync } from '../translate/prompt.js';
+import { parseDsml } from '../translate/dsml-parser.js';
+import { buildPromptAsync, buildPromptParts } from '../translate/prompt.js';
 import { writeOpenAiSse } from '../translate/sse-writer.js';
 import type {
   ChatCompletionResponse,
@@ -61,6 +75,8 @@ export interface CompletionsDependencies {
   readonly uploadFile?: (auth: Auth, file: UploadFileInput) => Promise<UploadedFile>;
   /** Ожидание готовности файлов (по умолчанию `fetchFilesAsync`). */
   readonly fetchFiles?: (auth: Auth, fileIds: readonly string[]) => Promise<readonly FileInfo[]>;
+  /** Провайдер для Google-моделей (по умолчанию — фабрики Gemini API/Web). */
+  readonly providerFor?: (model: ProviderModel) => ChatProvider;
   readonly now?: () => number;
   readonly generateId?: () => string;
 }
@@ -88,6 +104,37 @@ const upstreamStatus = (error: unknown): number => {
     return error.code === 429 || (error.code >= 500 && error.code < 600) ? 503 : 502;
   }
   return 502;
+};
+
+/**
+ * Определяет HTTP-статус для ошибки провайдера (Google).
+ * @param error Ошибка провайдера.
+ */
+const providerErrorStatus = (error: unknown): number => {
+  if (error instanceof ProviderNotConfiguredError) {
+    return 401;
+  }
+  if (error instanceof GoogleAuthNotFoundError || error instanceof GoogleAuthError) {
+    return 401;
+  }
+  if (error instanceof ProviderRequestError) {
+    return error.status;
+  }
+  return 502;
+};
+
+/**
+ * Подбирает OpenAI-совместимый `error.type` под статус.
+ * @param status HTTP-статус ответа.
+ */
+const errorTypeForStatus = (status: number): string => {
+  if (status === 401) {
+    return 'auth_error';
+  }
+  if (status === 503) {
+    return 'upstream_unavailable';
+  }
+  return 'upstream_error';
 };
 
 /** Максимальный размер входного изображения (10 МиБ, DESIGN § 3.5). */
@@ -264,6 +311,24 @@ export const registerCompletionsRoute = async (
   const now = dependencies.now ?? ((): number => Date.now());
   const generateId = dependencies.generateId ?? defaultGenerateId;
 
+  // Провайдеры Google создаются один раз: кэш `SNlM0e` живёт в замыкании
+  // (`createGeminiWebProvider`), пересоздание на каждый запрос лишало бы его.
+  const config = loadConfig();
+  const geminiApiProvider = createGeminiApiProvider({
+    apiKey: config.geminiApiKey,
+    baseUrl: config.geminiApiBaseUrl,
+    timeoutMs: config.geminiTimeoutMs,
+  });
+  const geminiWebProvider = createGeminiWebProvider({
+    authFile: config.googleAuthFile,
+    baseUrl: config.geminiWebBaseUrl,
+    timeoutMs: config.geminiTimeoutMs,
+  });
+  const providerFor =
+    dependencies.providerFor ??
+    ((model: ProviderModel): ChatProvider =>
+      model.provider === 'google-gemini-api' ? geminiApiProvider : geminiWebProvider);
+
   app.post('/v1/chat/completions', async (request, reply) => {
     const parsed = ChatCompletionRequestSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -289,85 +354,138 @@ export const registerCompletionsRoute = async (
       );
     }
 
-    let auth: Auth;
-    try {
-      auth = await loadAuth();
-    } catch {
-      return sendError(reply, 401, 'auth_error', 'Запустите pnpm webauth');
-    }
-
-    const sessionValid = await validateSession(auth);
-    if (!sessionValid) {
-      return sendError(reply, 401, 'auth_expired', 'Сессия истекла, запустите pnpm webauth');
-    }
-
-    let prompt: string;
-    try {
-      prompt = buildPromptAsync({
-        messages: body.messages,
-        tools: body.tools,
-        toolChoice: body.tool_choice,
-      }).prompt;
-    } catch (error: unknown) {
-      return sendError(reply, 400, 'invalid_request_error', String(error));
-    }
-
-    // S3: изображения из `content` (data:base64 и http(s)) готовим заранее —
-    // ошибки входного image_url возвращаем как 400 до похода в DeepSeek.
-    let images: UploadFileInput[];
-    try {
-      images = await loadImagesAsync(body.messages);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      return sendError(reply, 400, 'invalid_request_error', message);
-    }
-
-    let assembled: AssembledText;
-    let parsedDsml: ParsedDsml;
-    try {
-      const refFileIds: string[] = [];
-      for (const image of images) {
-        const uploaded = await uploadFile(auth, image);
-        refFileIds.push(uploaded.id);
-      }
-      if (refFileIds.length > 0) {
-        await fetchFiles(auth, refFileIds);
-      }
-      const chatSession = await createChatSession(auth);
-      const completionRequest: Omit<DeepSeekCompletionRequest, 'chat_session_id'> = {
-        parent_message_id: null,
-        // Захват 2026-10-20: при изображении клиент отправляет model_type
-        // "default", а картинка передаётся через ref_file_ids (не "vision").
-        model_type: body.model === 'deepseek-web-reasoner' ? 'reasoner' : 'default',
-        prompt,
-        ref_file_ids: refFileIds,
-        thinking_enabled: body.model === 'deepseek-web-reasoner',
-        search_enabled: false,
-        action: null,
-        preempt: false,
-      };
-      assembled = await assembleText(sendChat(completionRequest, auth, chatSession.id));
-      parsedDsml = parseDsml(assembled.text);
-    } catch (error: unknown) {
-      const status = upstreamStatus(error);
-      const message =
-        error instanceof DeepSeekNonSseError
-          ? `DeepSeek вернул не-SSE ответ: ${error.diagnostics.bodyPreview}`
-          : String(error);
+    const providerModel = resolveProviderModel(body.model);
+    if (providerModel === undefined) {
       return sendError(
         reply,
-        status,
-        status === 503 ? 'upstream_unavailable' : 'upstream_error',
-        message,
+        400,
+        'invalid_request_error',
+        `Неизвестная модель: ${body.model}. Доступны: ${listProviderModelIds().join(', ')}`,
       );
     }
+
+    const maxOutputTokens = body.max_completion_tokens ?? body.max_tokens;
+    let text: string;
+    let completionTokens: number;
+
+    if (providerModel.provider === 'deepseek-web') {
+      let auth: Auth;
+      try {
+        auth = await loadAuth();
+      } catch {
+        return sendError(reply, 401, 'auth_error', 'Запустите pnpm webauth');
+      }
+
+      const sessionValid = await validateSession(auth);
+      if (!sessionValid) {
+        return sendError(reply, 401, 'auth_expired', 'Сессия истекла, запустите pnpm webauth');
+      }
+
+      let prompt: string;
+      try {
+        prompt = buildPromptAsync({
+          messages: body.messages,
+          tools: body.tools,
+          toolChoice: body.tool_choice,
+        }).prompt;
+      } catch (error: unknown) {
+        return sendError(reply, 400, 'invalid_request_error', String(error));
+      }
+
+      // S3: изображения из `content` (data:base64 и http(s)) готовим заранее —
+      // ошибки входного image_url возвращаем как 400 до похода в DeepSeek.
+      let images: UploadFileInput[];
+      try {
+        images = await loadImagesAsync(body.messages);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return sendError(reply, 400, 'invalid_request_error', message);
+      }
+
+      let assembled: AssembledText;
+      try {
+        const refFileIds: string[] = [];
+        for (const image of images) {
+          const uploaded = await uploadFile(auth, image);
+          refFileIds.push(uploaded.id);
+        }
+        if (refFileIds.length > 0) {
+          await fetchFiles(auth, refFileIds);
+        }
+        const chatSession = await createChatSession(auth);
+        const isReasoner = providerModel.upstreamModel === 'reasoner';
+        const completionRequest: Omit<DeepSeekCompletionRequest, 'chat_session_id'> = {
+          parent_message_id: null,
+          // Захват 2026-10-20: при изображении клиент отправляет model_type
+          // "default", а картинка передаётся через ref_file_ids (не "vision").
+          model_type: isReasoner ? 'reasoner' : 'default',
+          prompt,
+          ref_file_ids: refFileIds,
+          thinking_enabled: isReasoner,
+          search_enabled: false,
+          action: null,
+          preempt: false,
+        };
+        assembled = await assembleText(sendChat(completionRequest, auth, chatSession.id));
+      } catch (error: unknown) {
+        const status = upstreamStatus(error);
+        const message =
+          error instanceof DeepSeekNonSseError
+            ? `DeepSeek вернул не-SSE ответ: ${error.diagnostics.bodyPreview}`
+            : String(error);
+        return sendError(reply, status, errorTypeForStatus(status), message);
+      }
+      text = assembled.text;
+      completionTokens = assembled.tokenUsage ?? 0;
+    } else {
+      // Google: L2 общий (DSML-инструкция в промпте), отличается транспорт
+      // и авторизация (API-ключ или cookie-сессия gemini.google.com).
+      if (extractImageUrls(body.messages).length > 0) {
+        return sendError(
+          reply,
+          400,
+          'invalid_request_error',
+          `Модель ${body.model} пока не поддерживает изображения (KI-1018)`,
+        );
+      }
+
+      let promptParts: ReturnType<typeof buildPromptParts>;
+      try {
+        promptParts = buildPromptParts({
+          messages: body.messages,
+          tools: body.tools,
+          toolChoice: body.tool_choice,
+        });
+      } catch (error: unknown) {
+        return sendError(reply, 400, 'invalid_request_error', String(error));
+      }
+
+      let result: ProviderCompletionResult;
+      try {
+        result = await providerFor(providerModel).completeAsync({
+          upstreamModel: providerModel.upstreamModel,
+          system: promptParts.system,
+          conversation: promptParts.conversation,
+          ...(body.temperature === undefined ? {} : { temperature: body.temperature }),
+          ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+        });
+      } catch (error: unknown) {
+        const status = providerErrorStatus(error);
+        const message = error instanceof Error ? error.message : String(error);
+        return sendError(reply, status, errorTypeForStatus(status), message);
+      }
+      text = result.text;
+      completionTokens = result.usage.completionTokens;
+    }
+
+    const parsedDsml = parseDsml(text);
 
     const responseId = `chatcmpl-${generateId()}`;
     const created = Math.floor(now() / 1000);
     const usage = {
       prompt_tokens: 0,
-      completion_tokens: assembled.tokenUsage ?? 0,
-      total_tokens: assembled.tokenUsage ?? 0,
+      completion_tokens: completionTokens,
+      total_tokens: completionTokens,
     };
     let content: string | null = parsedDsml.text === '' ? null : parsedDsml.text;
     const toolCalls: OpenAiToolCall[] = parsedDsml.tool_calls;
@@ -386,7 +504,7 @@ export const registerCompletionsRoute = async (
       } else {
         content = 'Готово.';
       }
-      request.log.warn('DeepSeek вернул пустой content, синтезирован fallback');
+      request.log.warn('upstream вернул пустой content, синтезирован fallback');
     }
 
     if (body.stream) {

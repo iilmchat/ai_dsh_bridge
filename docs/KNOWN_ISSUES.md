@@ -1,8 +1,8 @@
 # Известные проблемы AI DSH Bridge
 
-**Версия реестра:** 0.6.1
-**Дата последнего обновления:** 2026-10-20
-**Статус проекта:** v0.6.1 (scaffold)
+**Версия реестра:** 0.6.2
+**Дата последнего обновления:** 2026-11-18
+**Статус проекта:** v0.6.2 (scaffold)
 
 Формат: `KI-XXX` — название, приоритет, статус, файлы.
 Приоритеты: 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low
@@ -19,23 +19,23 @@
 
 | Статус | Количество | Записи |
 |---|---|---|
-| Open | 3 | KI-014, KI-015, KI-1016 |
+| Open | 6 | KI-014, KI-015, KI-1016, KI-1017, KI-1018, KI-1019 |
 | In Progress | 0 | — |
 | Fixed | 11 | KI-002, KI-003, KI-004, KI-005, KI-006, KI-007, KI-008, KI-009, KI-011, KI-012, KI-016 |
 | Documented | 1 | KI-001 |
 | Deferred | 1 | KI-010 |
 | Won't Fix | 1 | KI-013 |
-| **Всего** | **17** | — |
+| **Всего** | **20** | — |
 
 ### Приоритеты
 
 | Приоритет | Количество | Записи |
 |---|---|---|
 | 🔴 Critical | 1 | KI-005 |
-| 🟠 High | 6 | KI-002, KI-003, KI-004, KI-006, KI-007, KI-1016 |
-| 🟡 Medium | 7 | KI-008, KI-009, KI-011, KI-012, KI-013, KI-014, KI-016 |
+| 🟠 High | 7 | KI-002, KI-003, KI-004, KI-006, KI-007, KI-1016, KI-1017 |
+| 🟡 Medium | 9 | KI-008, KI-009, KI-011, KI-012, KI-013, KI-014, KI-016, KI-1018, KI-1019 |
 | 🟢 Low | 3 | KI-001, KI-010, KI-015 |
-| **Всего** | **17** | — |
+| **Всего** | **20** | — |
 
 ### Связь с этапами DESIGN § 10
 
@@ -313,6 +313,55 @@
 
 ---
 
+## v0.6.2 — Google providers (2026-11-18)
+
+### KI-1017 — Протокол веб-чата Gemini не проверен на живом аккаунте (Open)
+- **Приоритет:** 🟠 High | **Статус:** Open | **Обнаружено:** 2026-11-18
+- **Файлы:** `src/google/gemini-web.ts`, `test/gemini-web.test.ts`,
+  `docs/DESIGN_GOOGLE.md`
+- **Описание:** Форма `f.req`, извлечение `SNlM0e` и разбор кадров
+  `StreamGenerate` сверены с открытой библиотекой `gemini_webapi` (v1.14.4,
+  `src/gemini_webapi/client.py`), но не проверены живым запросом: в CI нет
+  аккаунта Google, а `google-auth.json` содержит только cookie.
+- **Влияние:** модель `google-gemini-web` может отвечать `502`/`401`, если
+  фактический протокол Google отличается от фикстур. `google-gemini-api-*`
+  и DeepSeek не затронуты.
+- **План:** снять захват `StreamGenerate` в DevTools (Network → Copy as
+  cURL), сохранить локально в `docs/captures/` (не коммитить), сверить
+  `f.req`/кадры, добавить fixture в `test/gemini-web.test.ts`.
+- **Обходной путь:** использовать `google-gemini-api-flash`/`-pro`.
+- **Связанные:** KI-1019, DESIGN_GOOGLE § 5.2.
+
+### KI-1018 — Google-провайдеры не принимают изображения (Open)
+- **Приоритет:** 🟡 Medium | **Статус:** Open | **Обнаружено:** 2026-11-18
+- **Файлы:** `src/api/completions.ts`, `src/google/gemini-api.ts`,
+  `src/google/gemini-web.ts`
+- **Описание:** Запрос с `image_url` к любой Google-модели возвращает
+  `400 invalid_request_error` («пока не поддерживает изображения»). Причина:
+  у Gemini API не реализован `inlineData`, у веб-чата — загрузка файла.
+- **Влияние:** vision-сценарии доступны только через `deepseek-web-*`.
+- **План:** Gemini API — `contents[].parts[].inlineData` (`mimeType`,
+  `data`); Gemini Web — загрузка через `content-push.googleapis.com/upload`
+  и `fileData` в промпте. Оба пути покрыть тестами.
+- **Обходной путь:** отправлять изображения в DeepSeek-модель.
+- **Связанные:** R-06-05/R-06-06 (ROADMAP), DESIGN_GOOGLE § 6.
+
+### KI-1019 — Веб-протокол Gemini может измениться без предупреждения (Open)
+- **Приоритет:** 🟡 Medium | **Статус:** Open | **Обнаружено:** 2026-11-18
+- **Файлы:** `src/google/gemini-web.ts`, `docs/DESIGN_GOOGLE.md`
+- **Описание:** `gemini.google.com` — неофициальный интерфейс: Google
+  меняет `rpcid`, структуру кадров и заголовки выбора модели без анонсов.
+  Устаревание проявляется кодом `1052` или пустым ответом.
+- **Влияние:** `google-gemini-web` может перестать работать после обновления
+  Google; остальные провайдеры не затронуты.
+- **План:** обновлять `buildGenerateRequestBody`/`readFrames` по захвату
+  (DESIGN_GOOGLE § 8), фиксировать версию сверки в KI-1017, держать
+  регрессионные фикстуры в `test/gemini-web.test.ts`.
+- **Обходной путь:** переключиться на `google-gemini-api-*`.
+- **Связанные:** KI-1017.
+
+---
+
 ## v0.6.1 — Vision images (2026-10-20)
 
 ### KI-1016 — SSRF: `http(s)` image_url скачивается без allowlist (Open)
@@ -455,6 +504,7 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | 0.5.7 | 2026-10-20 | Инструкция показывать вывод инструментов (`pwd`/`ls`/`cat`), не отвечать «Готово»; 117 тестов |
 | 0.6.0-alpha | 2026-10-20 | S1/S2 Vision: few-shot скриншота через PowerShell и OCR через `tesseract` (полный путь + `where tesseract`); fallback показывает последний tool-результат; 123 теста |
 | 0.6.1 | 2026-10-20 | S3: изображения через `upload_file` + `ref_file_ids`; KI-1003 → Fixed; добавлен KI-1016 (SSRF `image_url`); 136 тестов |
+| 0.6.2 | 2026-11-18 | Google-провайдеры: Gemini API и Gemini Web, реестр моделей, `webauth:google`; добавлены KI-1017…KI-1019; backlog KI-1020…KI-1022; 168 тестов |
 
 ---
 
@@ -482,6 +532,9 @@ DSML-парсеру и SSE-writer (Этапы 5–6).
 | KI-1013 | R-09-01 | 🟢 Low | Deferred | CDP-fallback, если прямые HTTP перестанут работать из-за WAF |
 | KI-1014 | R-09-02 | 🟢 Low | Deferred | Автообновление PoW-алгоритма при смене `DeepSeekHashV1` |
 | KI-1015 | R-09-03 | 🟢 Low | Deferred | Web UI настройки вместо `pnpm webauth` |
+| KI-1020 | R-06-05 | 🟠 High | Done | Gemini API (официальный, по ключу): `google-gemini-api-flash`/`-pro`, `:generateContent`, 0.6.2 |
+| KI-1021 | R-06-06 | 🟠 High | Done | Gemini Web (веб-чат `gemini.google.com`): `google-gemini-web`, `StreamGenerate`, `webauth:google`, 0.6.2 |
+| KI-1022 | R-06-07 | 🟡 Medium | Done | Слой провайдеров: `ChatProvider`, реестр `PROVIDER_MODELS`, роутинг моделей, 0.6.2 |
 
 ### KI-1003 — как закрыт (S3, 2026-10-20)
 

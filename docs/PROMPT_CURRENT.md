@@ -3,7 +3,8 @@
 **Версия документа:** 1.0.0
 **Дата:** 2026-10-19
 **Синхронизирован с:** [RULES.md](RULES.md) v1.0.0, [DESIGN.md](DESIGN.md) 0.2,
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) 0.6.1, `package.json` v0.6.1.
+[DESIGN_GOOGLE.md](DESIGN_GOOGLE.md) 1.0,
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) 0.6.2, `package.json` v0.6.2.
 **Назначение:** готовый к использованию системный промпт для ассистента
 проекта (человеко- или AI-исполнителя).
 
@@ -43,11 +44,12 @@ CDP/Chrome и протоколом PoW DeepSeek.
 
 ## 2. Статус проекта
 
-**Версия:** v0.6.1 (scaffold), дата релиза 2026-10-20.
+**Версия:** v0.6.2 (scaffold), дата релиза 2026-11-18.
 **Этап:** этапы 0, 2, 3 закрыты; этап 1 — JSON и SSE готовы; этап 4 —
 Prompt Builder; этап 5 — парсер (non-streaming, используется в SSE после
-буферизации); этап 6 — SSE-writer готов; остались этапы 7–8 (сквозной
-цикл DSH и устойчивость).
+буферизации); этап 6 — SSE-writer готов; этап 7 закрыт живым e2e DSH;
+остался этап 8 (устойчивость). Вне этапов: с 0.6.2 подключены
+Google-провайдеры (Gemini API и Gemini Web).
 
 ### 2.1. Что реализовано
 
@@ -56,9 +58,13 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | Документация | DESIGN, ARCHITECTURE, GETTING_STARTED, RULES, KNOWN_ISSUES, CHANGELOG, RELEASES, KI_GITHUB_SYNC, api-contract.json |
 | Каркас | Node.js 22+, TypeScript 6 strict ESM, `tsconfig.json` / `tsconfig.build.json`, Vitest 4, oxlint, pnpm-lock, `LICENSE` (MIT) |
 | `src/index.ts` | Fastify 5, pino, graceful shutdown, loopback `127.0.0.1:PORT` |
-| `GET /health` | `{ status: "ok", version: "0.6.1", uptime_sec }` |
-| `GET /v1/models` | `deepseek-web-chat`, `deepseek-web-reasoner`; каждая карточка содержит `capabilities` (`tools`, `function_calling`, `streaming`) для DSH |
-| `POST /v1/chat/completions` | JSON (`stream:false`) и SSE (`stream:true`): Zod → auth → Prompt Builder → DeepSeek → `assembleTextFromEvents` → DSML → JSON/чанки с `tool_calls`; `image_url` (data/http) загружается в DeepSeek и передаётся через `ref_file_ids` (S3, 0.6.1); usage по `include_usage` |
+| `GET /health` | `{ status: "ok", version: "0.6.2", uptime_sec }` |
+| `GET /v1/models` | `deepseek-web-chat`, `deepseek-web-reasoner`, `google-gemini-api-flash`, `google-gemini-api-pro`, `google-gemini-web` (из `PROVIDER_MODELS`); каждая карточка содержит `capabilities` (`tools`, `function_calling`, `streaming`) для DSH |
+| `POST /v1/chat/completions` | JSON (`stream:false`) и SSE (`stream:true`): Zod → реестр моделей → auth/Prompt Builder → DeepSeek или Google → DSML → JSON/чанки с `tool_calls`; `image_url` (data/http) загружается в DeepSeek и передаётся через `ref_file_ids` (S3, 0.6.1); usage по `include_usage` |
+| `src/providers/` | `ChatProvider` (contract), `ProviderNotConfiguredError`/`ProviderRequestError`, реестр `PROVIDER_MODELS` (0.6.2) |
+| `src/google/gemini-api.ts` | Gemini API по ключу: `:generateContent`, `x-goog-api-key`, `systemInstruction`/`contents`, `thought`-части отбрасываются, usage, маппинг ошибок (0.6.2) |
+| `src/google/gemini-web.ts` | Веб-чат `gemini.google.com`: `StreamGenerate` (`at`/`f.req`), `SNlM0e` из `/app` (кэш 5 мин), кадры `wrb.fr`, коды 1037/1052/1060 (0.6.2) |
+| `src/google/auth.ts` | `google-auth.json` (strict Zod), заголовок `Cookie`, сохранение `0600` (0.6.2) |
 | `src/config.ts` | Zod-валидация окружения, значения по умолчанию, раскрытие `~` |
 | `docs/captures/` | Захваты 2026-10-19: `users/current`, `create_pow_challenge`, `chat/completion`, SSE; секреты `<REDACTED>`, вне git |
 | `src/deepseek/types.ts` | Zod-схемы `PowChallenge`, `PowResponse`, `ChatCompletionRequest` (DESIGN §4.1/§6.3) |
@@ -73,7 +79,8 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 | `src/api/completions.schema.ts` | Zod-схема запроса (strict): model, messages, tools, tool_choice, stream, stream_options, top_p, penalties, stop, store, max_completion_tokens, n, seed, response_format, user, parallel_tool_calls |
 | `src/translate/types.ts` | `OpenAiMessage`, `OpenAiToolCall`, `OpenAiTool`, `ChatCompletionRequest/Response` (L1/L2) |
 | `src/auth/webauth.ts` | Chrome CDP :9222, извлечение `ds_session_id`/`aws-waf-token`/Bearer, `auth.json` 0600, таймаут 5 мин |
-| `test/` | **136 тестов** (pow, client, webauth, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream, api-models) |
+| `src/auth/webauth-google.ts` | Chrome CDP :9222, захват cookie `google.com` в `google-auth.json` 0600, проверка `/app`, таймаут 5 мин (0.6.2) |
+| `test/` | **168 тестов** (pow, client, webauth, webauth-google, e2e-script, prompt, dsml-parser, e2e-tools, api-completions, api-completions-stream, api-completions-google, api-models, providers, gemini-api, gemini-web) |
 | `scripts/e2e-deepseek.ts` | Живой e2e (`pnpm e2e:deepseek`): сессия → PoW → SSE → сборка текста, лог в `docs/captures/` с `<REDACTED>` |
 | `scripts/e2e-tools.ts` | Диагностика DSML (`pnpm e2e:tools`): prompt+tools → DeepSeek → `parseDsml`; `--prompt-only`, лог `e2e-tools-*.log` |
 | `.oxlintrc.json` | Конфиг oxlint: правила из RULES § 1/§ 4, `any` и `floating-promises` запрещены (KI-008 Fixed) |
@@ -83,31 +90,36 @@ Prompt Builder; этап 5 — парсер (non-streaming, использует
 
 `pnpm webauth`, клиент DeepSeek с PoW (0.2.0), Prompt Builder (0.3.0),
 DSML-парсер (0.3.1), `POST /v1/chat/completions` в обоих режимах (0.4.0
-JSON, 0.5.0 SSE) и изображения через `upload_file` + `ref_file_ids` (0.6.1)
-готовы; живой e2e DeepSeek проходит (`[8] E2E OK`), модель описывает
-загруженную картинку. Не реализовано: инкрементальный streaming (сейчас
-ответ буферизуется до полной сборки), автовосстановление сессии при 401,
-CDP-fallback транспорта, точный учёт prompt/completion-токенов (DeepSeek
-отдаёт только `accumulated_token_usage`), автоматический e2e-тест DSH
-(живой e2e подтверждён вручную). WAF-заголовки `x-hif-*` не нужны
-(KI-013 Won't Fix). Ссылки на этапы — в § 6.
+JSON, 0.5.0 SSE), изображения через `upload_file` + `ref_file_ids` (0.6.1) и
+Google-провайдеры — Gemini API и Gemini Web (0.6.2) — готовы; живой e2e
+DeepSeek проходит (`[8] E2E OK`), модель описывает загруженную картинку.
+Не реализовано: инкрементальный streaming (сейчас ответ буферизуется до
+полной сборки), автовосстановление сессии при 401, CDP-fallback транспорта,
+точный учёт prompt/completion-токенов (DeepSeek отдаёт только
+`accumulated_token_usage`), автоматический e2e-тест DSH (живой e2e
+подтверждён вручную), изображения для Google-провайдеров (KI-1018) и
+живая проверка веб-протокола Gemini (KI-1017). WAF-заголовки `x-hif-*` не
+нужны (KI-013 Won't Fix). Ссылки на этапы — в § 6.
 
-### 2.3. Состояние реестра проблем (актуально на 2026-10-20)
+### 2.3. Состояние реестра проблем (актуально на 2026-11-18)
 
-Всего в реестре **17** записей: **3 Open**, 11 Fixed (KI-002 — SSE-роут,
+Всего в реестре **20** записей: **6 Open**, 11 Fixed (KI-002 — SSE-роут,
 KI-003 — webauth, KI-004 — клиент+PoW, KI-005 — слой трансляции,
 KI-006 — SSE-writer, KI-007 — живой DSH e2e, KI-008 — `.oxlintrc.json`,
 KI-009 — `.env`, KI-011 — `LICENSE`, KI-012 — `--env-file-if-exists`,
 KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documented
 (KI-001 — шаблон), 1 Deferred (KI-010), 1 Won't Fix (KI-013 — WAF не
-обязателен). Открытые: KI-014, KI-015, KI-1016. Полные описания и планы —
-[docs/KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+обязателен). Открытые: KI-014, KI-015, KI-1016, KI-1017, KI-1018, KI-1019.
+Полные описания и планы — [docs/KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 | KI | Приоритет | Суть |
 |---|---|---|
 | KI-014 | 🟡 Medium | PoW-решатель на JS ~570 мс (цель 100–500 мс) |
 | KI-015 | 🟢 Low | `webauth`: ветка подключения к уже запущенному Chrome не проверена вживую |
 | KI-1016 | 🟠 High | SSRF: http(s)-`image_url` скачивается без allowlist и запрета приватных IP |
+| KI-1017 | 🟠 High | Веб-протокол Gemini не проверен на живом аккаунте (тесты на синтетических кадрах) |
+| KI-1018 | 🟡 Medium | Google-провайдеры не принимают изображения (`image_url` → 400) |
+| KI-1019 | 🟡 Medium | Веб-протокол Gemini может измениться без предупреждения |
 
 ---
 
@@ -130,6 +142,7 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 `pnpm build` (`tsc -p tsconfig.build.json`), `pnpm start`
 (`node --env-file-if-exists=.env dist/index.js`), `pnpm webauth`
 (`tsx --env-file-if-exists=.env src/auth/webauth.ts` — реализован в 0.2.0),
+`pnpm webauth:google` (`tsx src/auth/webauth-google.ts` — 0.6.2),
 `pnpm test`, `pnpm test:watch`, `pnpm lint`, `pnpm typecheck`,
 `pnpm e2e:deepseek` (`tsx scripts/e2e-deepseek.ts`),
 `pnpm e2e:tools` (`tsx scripts/e2e-tools.ts`), `pnpm run version`
@@ -202,18 +215,18 @@ KI-016 — живой e2e подтвердил `chat_session/create`), 1 Documen
 
 ## 5. Метрики
 
-Актуальны на 2026-10-20 (v0.6.1). Значения не выдумываются — при
+Актуальны на 2026-11-18 (v0.6.2). Значения не выдумываются — при
 обновлении сверяйся с реестром KI и файловой системой.
 
 | Метрика | Значение | Источник |
 |---|---|---|
-| Backend-тесты | **136** | `test/*.test.ts` (…/api-completions, api-models) |
-| Open KI | **3** | `docs/KNOWN_ISSUES.md` |
-| Всего KI | 17 (3 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
+| Backend-тесты | **168** | `test/*.test.ts` (…/api-completions, api-completions-google, api-models, providers, gemini-api, gemini-web, webauth-google) |
+| Open KI | **6** | `docs/KNOWN_ISSUES.md` |
+| Всего KI | 20 (6 Open, 11 Fixed, 1 Documented, 1 Deferred, 1 Won't Fix) | `docs/KNOWN_ISSUES.md` |
 | Критические KI | 0 | — |
-| Версия | 0.6.1 | `package.json`, `src/index.ts` |
+| Версия | 0.6.2 | `package.json`, `src/index.ts` |
 | Готовность этапов DESIGN § 10 | Этапы 0–7 закрыты; остался этап 8 (устойчивость) | § 6 |
-| Покрытие тестами | 136 тестов; живой e2e DSH подтверждён вручную | — |
+| Покрытие тестами | 168 тестов; живой e2e DSH подтверждён вручную | — |
 
 Правило: если в ответе приводится метрика (число тестов, Open KI, версия),
 она должна совпадать с этим разделом. Расхождение — повод обновить
@@ -223,7 +236,7 @@ PROMPT_CURRENT тем же коммитом.
 
 ## 6. План: этапы 0–8 (DESIGN § 10)
 
-| Этап | Содержание | Результат | Статус v0.6.1 | KI |
+| Этап | Содержание | Результат | Статус v0.6.2 | KI |
 |---|---|---|---|---|
 | 0. Исследование | Захват реального запроса/ответа DeepSeek через DevTools, проверка формата стриминга | `docs/captures/*.http`, `*.sse` | ✅ Захваты 2026-10-19; формат — JSON Patch, не DSML | — |
 | 1. Каркас | Fastify + `/v1/models` + `/v1/chat/completions` | Шлюз отвечает на `/v1/models`; чат JSON и SSE | ✅ JSON+SSE (0.4.0/0.5.0) | — |
@@ -348,6 +361,6 @@ Deferred, обёртка `screenshot` — Won't Fix). Следующая — v0.
 
 ---
 
-**Итог:** ты помогаешь довести AI DSH Bridge от scaffold v0.6.1 до
+**Итог:** ты помогаешь довести AI DSH Bridge от scaffold v0.6.2 до
 работающего сквозного сценария «DSH → tool_call → bash → результат →
 второй turn», не нарушая контракт SSE и правила безопасности.
